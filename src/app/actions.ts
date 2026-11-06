@@ -24,7 +24,7 @@ export async function createAccountAction(data: FormData) {
   const name = field(data, "name");
   const currency = field(data, "currency") || "IDR";
   const opening = field(data, "opening_balance") || "0";
-  if (!workspace || !name || !/^[A-Z]{3}$/.test(currency) || !/^-?\d+(\.\d{1,2})?$/.test(opening)) fail(workspace, "invalid_account");
+  if (!workspace || !name || name.length > 80 || !/^[A-Z]{3}$/.test(currency) || !/^-?\d+(\.\d{1,2})?$/.test(opening)) fail(workspace, "invalid_account");
   const db = await createClient();
   const { error } = await db.rpc("create_financial_account", {
     target_workspace: workspace, account_name: name, account_currency: currency, initial_balance: opening,
@@ -47,16 +47,18 @@ export async function createAndPostTransactionAction(data: FormData) {
   if (!auth.user) redirect("/login");
   const { data: acct, error: accountError } = await db.from("financial_accounts")
     .select("currency").eq("id", account).eq("workspace_id", workspace).single();
-  if (accountError || !acct) fail(workspace, "account_not_found");
+  const accountCurrency = acct?.currency;
+  if (accountError || typeof accountCurrency !== "string") fail(workspace, "account_not_found");
 
   const { data: draft, error: insertError } = await db.from("financial_transactions").insert({
     workspace_id: workspace, account_id: account, kind, status: "DRAFT", amount,
-    currency: acct.currency, description, direction: kind === "EXPENSE" ? "OUT" : "IN",
+    currency: accountCurrency, description, direction: kind === "EXPENSE" ? "OUT" : "IN",
     idempotency_key: randomUUID(), created_by: auth.user.id,
   }).select("id").single();
-  if (insertError || !draft) fail(workspace, "transaction_create_failed");
+  const draftId = draft?.id;
+  if (insertError || typeof draftId !== "string") fail(workspace, "transaction_create_failed");
 
-  const { error: postError } = await db.rpc("post_transaction", { target_transaction: draft.id });
+  const { error: postError } = await db.rpc("post_transaction", { target_transaction: draftId });
   if (postError) fail(workspace, "transaction_post_failed");
   revalidatePath("/");
   redirect(`/?workspace=${workspace}`);
