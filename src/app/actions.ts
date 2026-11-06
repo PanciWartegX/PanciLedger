@@ -89,7 +89,7 @@ export async function createCashReconciliationAction(data: FormData) {
   const account = field(data, "account_id");
   const counted = field(data, "counted_balance");
   const notes = field(data, "notes");
-  if (!workspace || !account || !/^\d+(\\.\d{1,2})?$/.test(counted) || Number(counted) < 0 || Number(counted) > 999999999999999999 || notes.length > 500) {
+  if (!workspace || !account || !/^\d+(\.\d{1,2})?$/.test(counted) || Number(counted) < 0 || Number(counted) > 999999999999999999 || notes.length > 500) {
     fail(workspace, "invalid_reconciliation");
   }
 
