@@ -1,12 +1,10 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useSearchParams } from "next/navigation";
 import { CircleDollarSign, LoaderCircle, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
-  const params = useSearchParams();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,7 +20,8 @@ export default function LoginPage() {
       if (mode === "signin") {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        window.location.assign(params.get("next") || "/");
+        const next = new URLSearchParams(window.location.search).get("next");
+        window.location.assign(next && next.startsWith("/") && !next.startsWith("//") ? next : "/");
       } else {
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
