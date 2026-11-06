@@ -64,7 +64,7 @@ export default async function Home({ searchParams }: Props) {
   const params = await searchParams;
   const db = await createClient();
   const { data: { user } } = await db.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect(params.accept_invite ? "/login?next="+encodeURIComponent("/?accept_invite="+params.accept_invite) : "/login");
 
   const { data: memberships } = await db.from("workspace_members").select("workspace_id,user_id,role").eq("user_id", user.id);
   const rows = memberships ?? [];
