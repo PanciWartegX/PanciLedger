@@ -40,26 +40,18 @@ export async function createAndPostTransactionAction(data: FormData) {
   const kind = field(data, "kind");
   const amount = field(data, "amount");
   const description = field(data, "description");
-  if (!workspace || !account || !["INCOME", "EXPENSE"].includes(kind) || !/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0 || !description || description.length > 240) fail(workspace, "invalid_transaction");
+  if (!workspace || !account || !["INCOME", "EXPENSE"].includes(kind) || !/^\\d+(\\.\\d{1,2})?$/.test(amount) || Number(amount) <= 0 || !description || description.length > 240) fail(workspace, "invalid_transaction");
 
   const db = await createClient();
-  const { data: auth } = await db.auth.getUser();
-  if (!auth.user) redirect("/login");
-  const { data: acct, error: accountError } = await db.from("financial_accounts")
-    .select("currency").eq("id", account).eq("workspace_id", workspace).single();
-  const accountCurrency = acct?.currency;
-  if (accountError || typeof accountCurrency !== "string") fail(workspace, "account_not_found");
-
-  const { data: draft, error: insertError } = await db.from("financial_transactions").insert({
-    workspace_id: workspace, account_id: account, kind, status: "DRAFT", amount,
-    currency: accountCurrency, description, direction: kind === "EXPENSE" ? "OUT" : "IN",
-    idempotency_key: randomUUID(), created_by: auth.user.id,
-  }).select("id").single();
-  const draftId = draft?.id;
-  if (insertError || typeof draftId !== "string") fail(workspace, "transaction_create_failed");
-
-  const { error: postError } = await db.rpc("post_transaction", { target_transaction: draftId });
-  if (postError) fail(workspace, "transaction_post_failed");
+  const { error } = await db.rpc("create_and_post_transaction", {
+    target_workspace: workspace,
+    target_account: account,
+    transaction_type: kind,
+    transaction_amount: amount,
+    transaction_description: description,
+    request_key: randomUUID(),
+  });
+  if (error) fail(workspace, "transaction_post_failed");
   revalidatePath("/");
   redirect(`/?workspace=${workspace}`);
 }
