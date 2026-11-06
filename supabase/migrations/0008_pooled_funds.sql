@@ -178,3 +178,22 @@ grant execute on function public.create_pooled_fund(uuid,text,numeric,char,uuid,
 grant execute on function public.set_pooled_fund_commitment(uuid,uuid,numeric) to authenticated;
 grant execute on function public.record_pooled_fund_contribution(uuid,uuid,numeric,text,uuid) to authenticated;
 grant execute on function public.record_pooled_fund_expense(uuid,numeric,text,uuid) to authenticated;
+
+-- A pooled-fund ledger entry is paired with a contribution/expense record.
+-- Prevent generic reversals from desynchronizing fund progress from the ledger.
+create or replace function public.guard_pooled_fund_ledger_reversal()
+returns trigger language plpgsql security definer set search_path='' as $
+begin
+ if new.kind='REVERSAL' and new.reversal_of is not null and (
+   exists(select 1 from public.pooled_fund_contributions c where c.transaction_id=new.reversal_of)
+   or exists(select 1 from public.pooled_fund_expenses e where e.transaction_id=new.reversal_of)
+ ) then
+  raise exception 'Pooled fund entries must be corrected through a dedicated fund adjustment workflow' using errcode='23514';
+ end if;
+ return new;
+end; $;
+revoke all on function public.guard_pooled_fund_ledger_reversal() from public,anon,authenticated;
+create trigger pooled_fund_ledger_reversal_guard
+before insert on public.financial_transactions
+for each row execute function public.guard_pooled_fund_ledger_reversal();
+
