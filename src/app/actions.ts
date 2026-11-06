@@ -133,6 +133,47 @@ export async function createBudgetAction(data: FormData) {
 
 
 
+
+export async function createWorkspaceInvitationAction(data: FormData) {
+ const workspace=field(data,"workspace_id"),email=field(data,"email").toLowerCase(),role=field(data,"role");
+ if(!workspace||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||!["OWNER","ADMIN","TREASURER","AUDITOR","MEMBER","VIEWER"].includes(role)) fail(workspace,"invalid_invitation");
+ const db=await createClient();
+ const {data:token,error}=await db.rpc("create_workspace_invitation",{target_workspace:workspace,target_email:email,target_role:role});
+ if(error||!token) fail(workspace,"invitation_create_failed");
+ revalidatePath("/");
+ redirect("/?workspace="+workspace+"&invite="+token);
+}
+
+export async function acceptWorkspaceInvitationAction(data: FormData) {
+ const token=field(data,"invite_token");
+ if(!/^[0-9a-f-]{36}$/i.test(token)) redirect("/?error=invalid_invitation");
+ const db=await createClient();
+ const {data:workspace,error}=await db.rpc("accept_workspace_invitation",{invite_token:token});
+ if(error||!workspace) redirect("/?error=invitation_accept_failed");
+ revalidatePath("/");
+ redirect("/?workspace="+workspace);
+}
+
+export async function removeWorkspaceMemberAction(data: FormData) {
+ const workspace=field(data,"workspace_id"),member=field(data,"member_id");
+ if(!workspace||!member) fail(workspace,"invalid_member");
+ const db=await createClient();
+ const {error}=await db.rpc("remove_workspace_member",{target_workspace:workspace,target_user:member});
+ if(error) fail(workspace,"member_remove_failed");
+ revalidatePath("/");
+ redirect("/?workspace="+workspace);
+}
+
+export async function changeWorkspaceMemberRoleAction(data: FormData) {
+ const workspace=field(data,"workspace_id"),member=field(data,"member_id"),role=field(data,"role");
+ if(!workspace||!member||!["OWNER","ADMIN","TREASURER","AUDITOR","MEMBER","VIEWER"].includes(role)) fail(workspace,"invalid_member");
+ const db=await createClient();
+ const {error}=await db.rpc("add_workspace_member",{target_workspace:workspace,target_user:member,assigned_role:role});
+ if(error) fail(workspace,"member_role_failed");
+ revalidatePath("/");
+ redirect("/?workspace="+workspace);
+}
+
 export async function markNotificationReadAction(data: FormData) {
  const workspace=field(data,"workspace_id"),notification=field(data,"notification_id");
  if(!workspace||!notification) fail(workspace,"invalid_notification");

@@ -2,7 +2,7 @@ import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CircleDollarSign, LayoutDa
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { FinanceCharts } from "@/components/finance-charts";
-import { createAccountAction, createAndPostTransactionAction, createBudgetAction, createCashReconciliationAction, markNotificationReadAction, createRecurringTransactionAction, executeDueRecurringAction, createSavingsGoalAction, moveSavingsFundsAction, createPooledFundAction, createPooledFundCommitmentAction, createPooledFundContributionAction, createPooledFundExpenseAction, createTransferAction, createWorkspaceAction, reverseTransactionAction, signOutAction } from "@/app/actions";
+import { createAccountAction, createAndPostTransactionAction, createBudgetAction, createCashReconciliationAction, createWorkspaceInvitationAction, acceptWorkspaceInvitationAction, removeWorkspaceMemberAction, changeWorkspaceMemberRoleAction, markNotificationReadAction, createRecurringTransactionAction, executeDueRecurringAction, createSavingsGoalAction, moveSavingsFundsAction, createPooledFundAction, createPooledFundCommitmentAction, createPooledFundContributionAction, createPooledFundExpenseAction, createTransferAction, createWorkspaceAction, reverseTransactionAction, signOutAction } from "@/app/actions";
 
 type Props = { searchParams: Promise<{ workspace?: string; error?: string }> };
 const money = (n: number, currency = "IDR") => new Intl.NumberFormat("id-ID", { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
@@ -46,7 +46,13 @@ const errorLabel = (code: string) => (({
   recurring_create_failed: "Gagal membuat transaksi berulang",
   recurring_execute_failed: "Gagal menjalankan transaksi yang jatuh tempo",
   invalid_notification: "Notifikasi tidak valid",
-  notification_update_failed: "Gagal memperbarui notifikasi"
+  notification_update_failed: "Gagal memperbarui notifikasi",
+  invalid_invitation: "Data undangan tidak valid",
+  invitation_create_failed: "Gagal membuat undangan",
+  invitation_accept_failed: "Undangan tidak dapat diterima",
+  invalid_member: "Data anggota tidak valid",
+  member_remove_failed: "Gagal menghapus anggota",
+  member_role_failed: "Gagal mengubah peran anggota"
 } as Record<string, string>)[code] ?? "Terjadi kesalahan. Silakan coba lagi.");
 const currencyTotals = (entries: { currency: string; amount: number }[]) => {
   const totals = new Map<string, number>();
@@ -62,6 +68,8 @@ export default async function Home({ searchParams }: Props) {
 
   const { data: memberships } = await db.from("workspace_members").select("workspace_id,user_id,role").eq("user_id", user.id);
   const rows = memberships ?? [];
+  const { data: invitationRows } = await db.from("workspace_invitations").select("id,workspace_id,invited_email,assigned_role,invite_token,expires_at,accepted_at").order("created_at",{ascending:false}).limit(20);
+  const invitations = invitationRows ?? [];
   const ids = rows.map((m) => m.workspace_id);
   const { data: spaces } = ids.length ? await db.from("workspaces").select("id,name").in("id", ids) : { data: [] as {id:string;name:string}[] };
   const workspaces = spaces ?? [];
@@ -126,6 +134,7 @@ export default async function Home({ searchParams }: Props) {
   const trendSeries=[...trendMap.values()].map(item=>({currency:item.currency,points:[...item.months.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([month,v])=>({month:new Intl.DateTimeFormat("id-ID",{month:"short",year:"2-digit"}).format(new Date(month+"-01T00:00:00")),income:v.income,expense:v.expense}))}));
   const unreadNotifications = notifications.filter((n) => !n.read_at).length;
   const workspaceMembers = rows.filter((m) => m.workspace_id === active.id);
+  const workspaceInvitations = invitations.filter((i) => i.workspace_id === active.id && !i.accepted_at && new Date(i.expires_at)>new Date());
   const fundById = new Map(pooledFunds.map((f) => [f.id, f]));
   const accountById = new Map(accts.map(a => [a.id, a]));
 
@@ -176,6 +185,16 @@ export default async function Home({ searchParams }: Props) {
 
 
 
+
+
+      <section className="panel mt-6 p-5">
+        <div><h3 className="font-semibold">Anggota & undangan</h3><p className="muted mt-1 text-xs">Kelola akses ruang kerja. Tautan undangan dapat dibagikan langsung kepada email tujuan.</p></div>
+        {["OWNER","ADMIN"].includes(role) && <form action={createWorkspaceInvitationAction} className="mt-4 grid gap-2 sm:grid-cols-3"><input type="hidden" name="workspace_id" value={active.id}/><input type="email" name="email" required placeholder="Email anggota" className="field"/><select name="role" className="field"><option value="MEMBER">Anggota</option><option value="TREASURER">Bendahara</option><option value="AUDITOR">Auditor</option><option value="VIEWER">Hanya lihat</option>{role==="OWNER"&&<><option value="ADMIN">Administrator</option><option value="OWNER">Pemilik</option></>}</select><button className="secondary">Buat undangan</button></form>}
+        {params.invite && <div className="mt-3 rounded-lg border border-emerald-400/20 p-3 text-xs"><div className="font-medium">Tautan undangan berhasil dibuat</div><a className="mt-1 block break-all underline" href={"/?accept_invite="+params.invite}>{typeof window==="undefined"?"Buka tautan undangan":window.location.origin+"/?accept_invite="+params.invite}</a></div>}
+        <div className="mt-4 divide-y divide-white/[.06]">{workspaceMembers.map(m=><div key={m.user_id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><div className="text-sm font-medium">{m.user_id===user.id?"Anda":m.user_id.slice(0,8)+"…"}</div><div className="muted text-xs">{roleLabel(m.role)}</div></div>{["OWNER","ADMIN"].includes(role)&&m.user_id!==user.id&&<div className="flex flex-wrap gap-2"><form action={changeWorkspaceMemberRoleAction} className="flex gap-1"><input type="hidden" name="workspace_id" value={active.id}/><input type="hidden" name="member_id" value={m.user_id}/><select name="role" defaultValue={m.role} className="field text-xs"><option value="MEMBER">Anggota</option><option value="TREASURER">Bendahara</option><option value="AUDITOR">Auditor</option><option value="VIEWER">Hanya lihat</option>{role==="OWNER"&&<><option value="ADMIN">Administrator</option><option value="OWNER">Pemilik</option></>}</select><button className="muted text-xs underline">Ubah</button></form><form action={removeWorkspaceMemberAction}><input type="hidden" name="workspace_id" value={active.id}/><input type="hidden" name="member_id" value={m.user_id}/><button className="text-xs text-rose-300 underline">Hapus</button></form></div>}</div>)}</div>
+        {workspaceInvitations.length>0&&<div className="mt-4 border-t border-white/[.07] pt-4"><h4 className="text-sm font-semibold">Undangan aktif</h4>{workspaceInvitations.map(i=><div key={i.id} className="flex flex-wrap justify-between gap-2 py-2 text-xs"><span>{i.invited_email} · {roleLabel(i.assigned_role)}<span className="muted block">Berlaku sampai {date(i.expires_at)}</span></span><a className="underline" href={"/?accept_invite="+i.invite_token}>Tautan</a></div>)}</div>}
+        {params.accept_invite && <form action={acceptWorkspaceInvitationAction} className="mt-4 rounded-xl border border-white/[.08] p-3"><input type="hidden" name="invite_token" value={params.accept_invite}/><p className="text-sm font-medium">Undangan ruang kerja</p><p className="muted mt-1 text-xs">Pastikan Anda masuk menggunakan alamat email yang menerima undangan.</p><button className="secondary mt-3 w-full">Terima undangan</button></form>}
+      </section>
 
       <section className="panel mt-6 p-5">
         <div className="flex items-center justify-between gap-3"><div><h3 className="font-semibold">Notifikasi</h3><p className="muted mt-1 text-xs">Pembaruan transaksi dalam ruang kerja ini</p></div><span className="rounded-lg border border-white/10 px-3 py-1.5 text-xs">{unreadNotifications} belum dibaca</span></div>
