@@ -6,20 +6,19 @@ Copyright © 2026 PanciWartegX. All rights reserved.
 
 ## Status
 
-The initial Next.js application shell and Supabase workspace foundation are on `develop`. The dashboard currently uses clearly labeled sample data; financial actions are not wired to a live database yet.
-
-## Stack
-
-Next.js App Router, TypeScript strict, Supabase PostgreSQL/Auth/SSR/Storage, Tailwind CSS, React Hook Form, Zod, Recharts, and Lucide.
+The `develop` branch contains the Next.js application shell, Supabase SSR clients, email/password authentication UI, route session guard, CI workflow, and initial workspace schema migrations. The dashboard still contains sample data; financial actions are not connected to live database records.
 
 ## Local development
 
-1. Install Node.js 20.9+.
+1. Use Node.js 20.9+.
 2. Run `npm install`.
-3. Copy `.env.example` to `.env.local` and fill in the Supabase project URL and anon key.
-4. Run `npm run dev`.
+3. Copy `.env.example` to `.env.local`.
+4. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` from Supabase API settings.
+5. Run `npm run dev`.
 
-Apply SQL migrations with the Supabase CLI only after reviewing them. Never expose the Supabase service-role key to browser code.
+Never commit `.env.local`. The publishable/anon key is intended for client use but must be paired with correct Row Level Security. Never expose the Supabase service-role key to browser code.
+
+Apply SQL migrations with the Supabase CLI only after review. Configure Supabase Auth Site URL and allowed redirect URLs for local and Preview deployments.
 
 ## Product invariants
 
@@ -29,6 +28,10 @@ Apply SQL migrations with the Supabase CLI only after reviewing them. Never expo
 - Posted transactions are immutable; corrections use reversal records.
 - Writes must be atomic and idempotent.
 - Preview deployments only until explicit Production approval.
+
+## Validation
+
+CI runs dependency installation, TypeScript type-checking, ESLint, and a Next.js production build for pushes and pull requests to `main` and `develop`.
 
 ## Planned modules
 
