@@ -21,11 +21,21 @@ export default function LoginPage() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         const next = new URLSearchParams(window.location.search).get("next");
-        window.location.assign(next && next.startsWith("/") && !next.startsWith("//") ? next : "/");
+        const target = next ? new URL(next, window.location.origin) : new URL("/", window.location.origin);
+        window.location.assign(target.origin === window.location.origin ? `${target.pathname}${target.search}${target.hash}` : "/");
       } else {
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        const emailRedirectTo = new URL("/auth/callback?next=%2F", window.location.origin).toString();
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo },
+        });
         if (error) throw error;
-        setMessage(data.session ? "Account created. You can now sign in." : "Account created. Check your email to confirm your address.");
+        if (data.session) {
+          window.location.assign("/");
+          return;
+        }
+        setMessage("Account created. Check your email to confirm your address.");
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Authentication failed. Please try again.");
