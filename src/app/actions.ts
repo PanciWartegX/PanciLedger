@@ -84,6 +84,28 @@ export async function reverseTransactionAction(data: FormData) {
   redirect(`/?workspace=${workspace}`);
 }
 
+export async function createCashReconciliationAction(data: FormData) {
+  const workspace = field(data, "workspace_id");
+  const account = field(data, "account_id");
+  const counted = field(data, "counted_balance");
+  const notes = field(data, "notes");
+  if (!workspace || !account || !/^\\d+(\\.\\d{1,2})?$/.test(counted) || Number(counted) < 0 || Number(counted) > 999999999999999999 || notes.length > 500) {
+    fail(workspace, "invalid_reconciliation");
+  }
+
+  const db = await createClient();
+  const { error } = await db.rpc("create_cash_reconciliation", {
+    target_workspace: workspace,
+    target_account: account,
+    counted_amount: counted,
+    reconciliation_notes: notes,
+    request_key: randomUUID(),
+  });
+  if (error) fail(workspace, "reconciliation_failed");
+  revalidatePath("/");
+  redirect(`/?workspace=${workspace}`);
+}
+
 export async function signOutAction() {
   const db = await createClient();
   await db.auth.signOut();
