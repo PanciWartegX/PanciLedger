@@ -69,12 +69,15 @@ declare g public.savings_goals%rowtype; actor uuid:=auth.uid(); transfer_group u
 begin
  select * into g from public.savings_goals where id=target_goal and is_active for update;
  if not found or actor is null or not public.has_workspace_role(g.workspace_id,array['OWNER','ADMIN','TREASURER']::public.workspace_role[]) then raise exception 'Insufficient workspace permissions or goal not found' using errcode='42501'; end if;
- if movement_kind not in ('DEPOSIT','WITHDRAWAL') or movement_amount is null or movement_amount<=0 or movement_amount>999999999999999999 or other_account is null or other_account=g.account_id or request_key is null then raise exception 'Invalid savings movement' using errcode='22023'; end if;
+ if movement_kind is null or movement_kind not in ('DEPOSIT','WITHDRAWAL') or movement_amount is null or movement_amount<=0 or movement_amount>999999999999999999 or other_account is null or other_account=g.account_id or request_key is null then raise exception 'Invalid savings movement' using errcode='22023'; end if;
  perform pg_advisory_xact_lock(hashtextextended(request_key::text,0));
  select * into existing from public.savings_movements m where m.workspace_id=g.workspace_id and m.request_key=move_savings_funds.request_key;
  if found then
   if existing.goal_id<>g.id or existing.movement_type<>movement_kind or existing.amount<>movement_amount or existing.created_by<>actor then raise exception 'Idempotency payload mismatch' using errcode='22023'; end if;
   return existing.id;
+ end if;
+ if exists(select 1 from public.financial_transactions t where t.workspace_id=g.workspace_id and t.idempotency_key=request_key) then
+  raise exception 'Request key is already used by another ledger operation' using errcode='23505';
  end if;
  if movement_kind='DEPOSIT' then
   transfer_group:=public.create_transfer(g.workspace_id,other_account,g.account_id,movement_amount,'Setoran tabungan: '||g.name,request_key);
