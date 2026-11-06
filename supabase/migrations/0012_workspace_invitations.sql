@@ -36,9 +36,11 @@ end; $wi$;
 
 create or replace function public.accept_workspace_invitation(invite_token uuid)
 returns uuid language plpgsql security definer set search_path='' as $wi$
-declare actor uuid:=auth.uid(); actor_email text:=lower(coalesce(auth.jwt()->>'email','')); invitation public.workspace_invitations%rowtype; inviter_role public.workspace_role;
+declare actor uuid:=auth.uid(); actor_email text; invitation public.workspace_invitations%rowtype; inviter_role public.workspace_role;
 begin
- if actor is null or actor_email='' or invite_token is null then raise exception 'Authenticated email and invitation token required' using errcode='28000'; end if;
+ if actor is null or invite_token is null then raise exception 'Authenticated email and invitation token required' using errcode='28000'; end if;
+ select lower(u.email) into actor_email from auth.users u where u.id=actor and u.email_confirmed_at is not null;
+ if actor_email is null or actor_email='' then raise exception 'A verified email address is required to accept invitations' using errcode='42501'; end if;
  select * into invitation from public.workspace_invitations i where i.invite_token=accept_workspace_invitation.invite_token for update;
  if not found or invitation.accepted_at is not null or invitation.expires_at<=now() or invitation.invited_email<>actor_email then raise exception 'Invitation is invalid, expired or addressed to another email' using errcode='42501'; end if;
  select m.role into inviter_role from public.workspace_members m where m.workspace_id=invitation.workspace_id and m.user_id=invitation.invited_by;

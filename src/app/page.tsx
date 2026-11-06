@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { FinanceCharts } from "@/components/finance-charts";
 import { createAccountAction, createAndPostTransactionAction, createBudgetAction, createCashReconciliationAction, createWorkspaceInvitationAction, acceptWorkspaceInvitationAction, removeWorkspaceMemberAction, changeWorkspaceMemberRoleAction, markNotificationReadAction, createRecurringTransactionAction, executeDueRecurringAction, createSavingsGoalAction, moveSavingsFundsAction, createPooledFundAction, createPooledFundCommitmentAction, createPooledFundContributionAction, createPooledFundExpenseAction, createTransferAction, createWorkspaceAction, reverseTransactionAction, signOutAction } from "@/app/actions";
 
-type Props = { searchParams: Promise<{ workspace?: string; error?: string }> };
+type Props = { searchParams: Promise<{ workspace?: string; error?: string; invite?: string; accept_invite?: string }> };
 const money = (n: number, currency = "IDR") => new Intl.NumberFormat("id-ID", { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
 const date = (s: string) => new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(new Date(s));
 const roleLabel = (role: string) => (({ OWNER: "Pemilik", ADMIN: "Administrator", TREASURER: "Bendahara", AUDITOR: "Auditor", VIEWER: "Hanya lihat", MEMBER: "Anggota" }) as Record<string, string>)[role] ?? role;
