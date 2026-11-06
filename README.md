@@ -1,59 +1,62 @@
 # PanciLedger
 
-**PanciWartegX** — multi-workspace financial management.
+**PanciWartegX** — pengelolaan keuangan dalam beberapa ruang kerja.
 
-Copyright © 2026 PanciWartegX. All rights reserved.
+Hak cipta © 2026 PanciWartegX. Seluruh hak dilindungi.
 
-## Current implementation
+## Status pengembangan
 
-The `main` branch contains a Next.js App Router application with Supabase email/password authentication, server-side session refresh, multi-workspace dashboard with workspace creation, workspace roles, account creation, atomic income/expense posting, atomic same-currency transfers, single-entry reversals, and workspace audit activity.
+Branch `main` berisi aplikasi Next.js App Router dengan autentikasi email/kata sandi Supabase, pembaruan sesi di sisi server, dashboard multi-ruang-kerja, pembuatan ruang kerja, pengaturan peran anggota, pembuatan akun keuangan, pencatatan pemasukan dan pengeluaran secara atomik, transfer antar-akun bermata uang sama, pembalikan transaksi tunggal, serta aktivitas audit ruang kerja.
 
-The application is still under development. Shared-fund pools, paired transfer reversals, budgets, savings goals, recurring transactions, reports/exports, notifications, account administration, and broader automated integration tests are not complete. Do not treat the current build as production-ready until the database migrations and live Supabase flows have been tested.
+Antarmuka pengguna menggunakan Bahasa Indonesia. Domain produksi yang dituju adalah **https://panciledger.vercel.app**.
 
-## Stack
+Aplikasi masih dalam pengembangan. Fitur dana bersama, pembalikan transfer berpasangan, anggaran, target tabungan, transaksi berulang, laporan/ekspor, notifikasi, administrasi akun dan anggota, serta pengujian integrasi yang lebih luas belum selesai. Jangan anggap aplikasi siap produksi sebelum migrasi database dan alur Supabase diuji langsung.
 
-- Next.js App Router + TypeScript
-- Supabase Auth, PostgreSQL, Row Level Security, and SQL RPCs
+## Teknologi
+
+- Next.js App Router dan TypeScript
+- Supabase Auth, PostgreSQL, Row Level Security, dan SQL RPC
 - Tailwind CSS
-- Recharts and Lucide
+- Recharts dan Lucide
 
-## Local development
+## Menjalankan secara lokal
 
-1. Use Node.js 20.9 or newer.
-2. Install dependencies with `npm install`.
-3. Copy `.env.example` to `.env.local`.
-4. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local`.
-5. Apply every SQL migration in `supabase/migrations` to the intended Supabase project, in filename order, after reviewing it.
-6. Configure Supabase Auth Site URL and Redirect URLs for local development.
-7. Run `npm run dev`.
+1. Gunakan Node.js versi 20.9 atau lebih baru.
+2. Pasang dependensi dengan `npm install`.
+3. Salin `.env.example` menjadi `.env.local`.
+4. Isi `NEXT_PUBLIC_SUPABASE_URL` dan `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` di `.env.local`.
+5. Tinjau dan terapkan seluruh migrasi SQL di `supabase/migrations` secara berurutan pada project Supabase yang benar.
+6. Atur Site URL dan Redirect URLs Supabase Auth untuk pengembangan lokal.
+7. Jalankan `npm run dev`.
 
-The publishable key is designed for browser use. It does not grant elevated database access; Row Level Security and server-side authorization remain mandatory. No Supabase secret/service-role key is required by the current application. Never put a secret key in a `NEXT_PUBLIC_*` variable or commit it.
+Publishable key memang dirancang untuk digunakan di browser dan tidak memberikan akses database tingkat tinggi. Row Level Security dan pemeriksaan otorisasi di server tetap wajib. Aplikasi saat ini tidak membutuhkan secret/service-role key Supabase. Jangan pernah memasukkan secret key ke variabel `NEXT_PUBLIC_*` atau menyimpannya di Git.
 
-## Vercel Preview setup
+## Pengaturan Vercel
 
-1. Import the private GitHub repository `PanciWartegX/PanciLedger` into Vercel.
-2. Set the Vercel project name to `panciledger` (the dashboard may normalize capitalization; the visible app branding remains **PanciLedger**).
-3. Set the Production Branch to `main`; use `develop` as a Preview branch.
-4. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to the **Preview** environment only at first.
-5. Apply all migrations in `supabase/migrations` in filename order. The security-hardening migration tightens public/anonymous grants and adds missing foreign-key indexes; the atomic-ledger migration makes income/expense creation and posting one database transaction. Confirm that the Supabase migration history is reconciled before adopting automated CLI deployments; migrations `0001`–`0006` were initially applied through the SQL Editor and may not be recorded in migration history.\n6. Add the Preview deployment URL to Supabase Auth Redirect URLs and configure the Site URL appropriately for the intended auth flow.
-7. Deploy a Preview and test sign-up, email confirmation, sign-in, workspace isolation, roles, account balances, transactions, transfers, reversals, workspace creation, and sign-out.
-8. Keep Production environment variables and Production deployment disabled until explicitly approved and all tests pass.
+1. Hubungkan repository privat `PanciWartegX/PanciLedger` ke Vercel.
+2. Pastikan nama project Vercel adalah `panciledger` agar domain bawaan yang dituju menjadi `panciledger.vercel.app`.
+3. Gunakan branch `main` sebagai Production Branch. Branch `develop` dapat digunakan untuk Preview.
+4. Pastikan `NEXT_PUBLIC_SUPABASE_URL` dan `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` tersedia pada environment yang digunakan.
+5. Di Vercel, buka **Project Settings → Domains** dan pastikan `panciledger.vercel.app` ditambahkan serta berstatus valid. Nama domain belum dianggap aktif hanya karena sudah ditulis di konfigurasi aplikasi.
+6. Tambahkan `https://panciledger.vercel.app/auth/callback` ke Supabase Authentication → URL Configuration → Redirect URLs. Atur Site URL ke `https://panciledger.vercel.app` setelah deployment domain tervalidasi.
+7. Uji pendaftaran, konfirmasi email, login, isolasi antar-ruang kerja, peran anggota, saldo akun, transaksi, transfer, pembalikan transaksi, pembuatan ruang kerja, dan logout.
+8. Pertahankan deployment Preview sampai semua pengujian berhasil dan deployment Production disetujui.
 
-Vercel automatically detects Next.js; no custom build command is required. The expected build command is `npm run build`.
+Vercel mendeteksi Next.js secara otomatis. Perintah build yang digunakan adalah `npm run build`.
 
-## Product invariants
+## Prinsip data dan keamanan
 
-- One user account can manage multiple workspaces.
-- Workspace membership and roles are enforced by PostgreSQL RLS and server-side checks.
-- Monetary values use PostgreSQL `numeric`, not floating-point storage.
-- Posted transactions are immutable; corrections use reversal records.
-- Transfers are two-sided and committed atomically.
-- Preview deployments only until explicit Production approval.
+- Satu akun pengguna dapat mengelola beberapa ruang kerja.
+- Keanggotaan dan peran ruang kerja ditegakkan oleh PostgreSQL RLS dan pemeriksaan sisi server.
+- Nilai uang disimpan menggunakan PostgreSQL `numeric`, bukan floating point.
+- Transaksi yang sudah dibukukan tidak dapat diubah; koreksi dilakukan melalui catatan pembalikan.
+- Transfer terdiri dari dua sisi dan disimpan secara atomik.
+- Deployment Preview dipertahankan sampai Production disetujui secara eksplisit.
 
-## Validation
+## Validasi
 
-CI runs dependency installation, TypeScript type-checking, ESLint, and a Next.js production build for pushes and pull requests to `main` and `develop`.
+CI menjalankan pemasangan dependensi, pemeriksaan tipe TypeScript, ESLint, dan build Next.js untuk push serta pull request ke branch `main` dan `develop`.
 
-## Planned modules
+## Fitur yang direncanakan
 
-Shared funds/contributions, savings goals, budgets, recurring transactions, reports/exports, notifications, secure attachments, account/member management, and expanded test coverage.
+Dana bersama/iuran, target tabungan, anggaran, transaksi berulang, laporan dan ekspor, notifikasi, lampiran aman, administrasi akun/anggota, serta cakupan pengujian yang lebih luas.
