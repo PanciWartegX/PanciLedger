@@ -1,7 +1,7 @@
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CircleDollarSign, LayoutDashboard, LogOut, Plus, ShieldCheck, Wallet } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { createAccountAction, createAndPostTransactionAction, createBudgetAction, createCashReconciliationAction, createTransferAction, createWorkspaceAction, reverseTransactionAction, signOutAction } from "@/app/actions";
+import { createAccountAction, createAndPostTransactionAction, createBudgetAction, createCashReconciliationAction, createPooledFundAction, createPooledFundCommitmentAction, createPooledFundContributionAction, createPooledFundExpenseAction, createTransferAction, createWorkspaceAction, reverseTransactionAction, signOutAction } from "@/app/actions";
 
 type Props = { searchParams: Promise<{ workspace?: string; error?: string }> };
 const money = (n: number, currency = "IDR") => new Intl.NumberFormat("id-ID", { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
@@ -42,7 +42,7 @@ export default async function Home({ searchParams }: Props) {
   const { data: { user } } = await db.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data: memberships } = await db.from("workspace_members").select("workspace_id,role").eq("user_id", user.id);
+  const { data: memberships } = await db.from("workspace_members").select("workspace_id,user_id,role").eq("user_id", user.id);
   const rows = memberships ?? [];
   const ids = rows.map((m) => m.workspace_id);
   const { data: spaces } = ids.length ? await db.from("workspaces").select("id,name").in("id", ids) : { data: [] as {id:string;name:string}[] };
@@ -52,13 +52,18 @@ export default async function Home({ searchParams }: Props) {
 
   const role = rows.find((m) => m.workspace_id === active.id)?.role ?? "VIEWER";
   const canWrite = ["OWNER","ADMIN","TREASURER"].includes(role);
-  const [{ data: accounts }, { data: transactions }, { data: audit }, { data: reconciliationRows }, { data: budgetRows }, { data: budgetUsageRows }] = await Promise.all([
+  const [{ data: accounts }, { data: transactions }, { data: audit }, { data: reconciliationRows }, { data: budgetRows }, { data: budgetUsageRows }, { data: pooledFundRows }, { data: pooledBalanceRows }, { data: pooledProgressRows }, { data: pooledContributionRows }, { data: pooledExpenseRows }] = await Promise.all([
     db.from("workspace_account_balances").select("id,name,currency,current_balance,is_active").eq("workspace_id", active.id).order("created_at"),
     db.from("financial_transactions").select("id,kind,amount,currency,description,occurred_at,direction").eq("workspace_id", active.id).eq("status", "POSTED").order("occurred_at", {ascending:false}).limit(12),
     db.from("workspace_audit_log").select("id,action,created_at").eq("workspace_id", active.id).order("created_at", {ascending:false}).limit(6),
     db.from("cash_reconciliations").select("id,account_id,expected_balance,counted_balance,difference,notes,created_at").eq("workspace_id", active.id).order("created_at", {ascending:false}).limit(8),
     db.from("workspace_budgets").select("id,name,amount,currency,period_start,period_end,account_id,is_active,created_at").eq("workspace_id", active.id).eq("is_active", true).order("period_start", {ascending:false}),
     db.from("workspace_budget_usage").select("budget_id,spent").eq("workspace_id", active.id),
+    db.from("pooled_funds").select("id,name,target_amount,currency,account_id,target_date,is_active,created_at").eq("workspace_id", active.id).eq("is_active", true).order("created_at", {ascending:false}),
+    db.from("pooled_fund_balances").select("fund_id,balance,total_contributions,total_expenses").eq("workspace_id", active.id),
+    db.from("pooled_fund_member_progress").select("fund_id,member_id,committed_amount,paid_amount,status").eq("workspace_id", active.id),
+    db.from("pooled_fund_contributions").select("id,fund_id,contributor_id,amount,notes,created_at").eq("workspace_id", active.id).order("created_at", {ascending:false}).limit(12),
+    db.from("pooled_fund_expenses").select("id,fund_id,created_by,amount,description,created_at").eq("workspace_id", active.id).order("created_at", {ascending:false}).limit(8),
   ]);
   const accts = accounts ?? [];
   const txs = transactions ?? [];
@@ -69,6 +74,13 @@ export default async function Home({ searchParams }: Props) {
   const reconciliations = reconciliationRows ?? [];
   const budgets = budgetRows ?? [];
   const budgetSpent = new Map((budgetUsageRows ?? []).map((item) => [item.budget_id, Number(item.spent)]));
+  const pooledFunds = pooledFundRows ?? [];
+  const pooledBalances = new Map((pooledBalanceRows ?? []).map((item) => [item.fund_id, item]));
+  const pooledProgress = pooledProgressRows ?? [];
+  const pooledContributions = pooledContributionRows ?? [];
+  const pooledExpenses = pooledExpenseRows ?? [];
+  const workspaceMembers = rows.filter((m) => m.workspace_id === active.id);
+  const fundById = new Map(pooledFunds.map((f) => [f.id, f]));
   const accountById = new Map(accts.map(a => [a.id, a]));
 
   return <main className="min-h-screen lg:flex">
@@ -112,6 +124,21 @@ export default async function Home({ searchParams }: Props) {
             </div>;
           })}
         </div> : <p className="muted mt-4 text-sm">Belum ada rekonsiliasi kas.</p>}
+      </section>
+
+
+      <section className="panel mt-6 p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">Dana bersama</h3><p className="muted mt-1 text-xs">Iuran dan pengeluaran dibukukan sebagai transaksi ledger pada akun dana.</p></div><span className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400">{pooledFunds.length} dana aktif</span></div>
+        {canWrite && activeAccounts.length > 0 && <form action={createPooledFundAction} className="mt-4 grid gap-3 border-b border-white/[.07] pb-5 sm:grid-cols-2"><input type="hidden" name="workspace_id" value={active.id}/><input name="name" required maxLength={80} placeholder="Nama dana bersama" className="field"/><input name="target_amount" type="number" min="0.01" step="0.01" required placeholder="Target dana" className="field"/><select name="currency" className="field"><option value="IDR">IDR</option><option value="USD">USD</option><option value="MYR">MYR</option></select><select name="account_id" className="field" required>{activeAccounts.map(a=><option key={a.id} value={a.id}>{a.name} · {a.currency}</option>)}</select><label className="muted text-xs">Batas waktu (opsional)<input name="target_date" type="date" className="field mt-1"/></label><button className="secondary sm:col-span-2"><Plus size={15}/> Buat dana bersama</button></form>}
+        {pooledFunds.length ? <div className="mt-4 grid gap-3 md:grid-cols-2">{pooledFunds.map(f=>{const b=pooledBalances.get(f.id);const total=Number(b?.total_contributions??0);const spent=Number(b?.total_expenses??0);const balance=Number(b?.balance??0);const target=Number(f.target_amount);const pct=target>0?Math.min(100,Math.round(total/target*100)):0;return <div key={f.id} className="rounded-xl border border-white/[.08] p-4"><div className="flex items-start justify-between gap-3"><div><div className="text-sm font-medium">{f.name}</div><div className="muted mt-1 text-xs">Target {money(target,f.currency.trim())}{f.target_date ? " · "+f.target_date : ""}</div></div><div className="text-sm font-semibold text-emerald-300">{pct}%</div></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-emerald-400" style={{width:pct+"%"}}/></div><div className="muted mt-2 flex flex-wrap justify-between gap-2 text-xs"><span>Masuk: {money(total,f.currency.trim())}</span><span>Keluar: {money(spent,f.currency.trim())}</span></div><div className="mt-2 text-sm font-semibold">Saldo dana: {money(balance,f.currency.trim())}</div></div>;})}</div> : <p className="muted mt-4 text-sm">Belum ada dana bersama aktif.</p>}
+        {pooledFunds.length>0 && <div className="mt-5 grid gap-4 border-t border-white/[.07] pt-5 xl:grid-cols-2">
+          <div><h4 className="text-sm font-semibold">Catat iuran masuk</h4><p className="muted mt-1 text-xs">Anggota mencatat iurannya sendiri; catatan langsung masuk ke ledger.</p><form action={createPooledFundContributionAction} className="mt-3 space-y-2"><input type="hidden" name="workspace_id" value={active.id}/><select name="fund_id" required className="field">{pooledFunds.map(f=><option key={f.id} value={f.id}>{f.name} · {f.currency}</option>)}</select><input name="amount" type="number" min="0.01" step="0.01" required placeholder="Jumlah iuran" className="field"/><input name="notes" maxLength={240} placeholder="Catatan (opsional)" className="field"/><button className="secondary w-full">Catat iuran saya</button></form></div>
+          {canWrite && <div><h4 className="text-sm font-semibold">Catat pengeluaran dana</h4><p className="muted mt-1 text-xs">Pengeluaran dibatasi oleh saldo dana yang tersedia.</p><form action={createPooledFundExpenseAction} className="mt-3 space-y-2"><input type="hidden" name="workspace_id" value={active.id}/><select name="fund_id" required className="field">{pooledFunds.map(f=><option key={f.id} value={f.id}>{f.name} · {f.currency}</option>)}</select><input name="amount" type="number" min="0.01" step="0.01" required placeholder="Jumlah pengeluaran" className="field"/><input name="description" required maxLength={240} placeholder="Keterangan pengeluaran" className="field"/><button className="secondary w-full">Buku pengeluaran dana</button></form></div>}
+        </div>}
+        {canWrite && pooledFunds.length>0 && workspaceMembers.length>0 && <div className="mt-5 border-t border-white/[.07] pt-5"><h4 className="text-sm font-semibold">Komitmen iuran anggota</h4><p className="muted mt-1 text-xs">Status lunas dihitung dari iuran yang tercatat, bukan sekadar klaim pembayaran.</p><form action={createPooledFundCommitmentAction} className="mt-3 grid gap-2 sm:grid-cols-3"><input type="hidden" name="workspace_id" value={active.id}/><select name="fund_id" required className="field">{pooledFunds.map(f=><option key={f.id} value={f.id}>{f.name}</option>)}</select><select name="member_id" required className="field">{workspaceMembers.map(m=><option key={m.user_id} value={m.user_id}>{roleLabel(m.role)} · {m.user_id.slice(0,8)}</option>)}</select><input name="amount" type="number" min="0.01" step="0.01" required placeholder="Komitmen anggota" className="field"/><button className="secondary sm:col-span-3">Simpan komitmen</button></form></div>}
+        <div className="mt-5 grid gap-4 xl:grid-cols-2"><div><h4 className="text-sm font-semibold">Progress iuran anggota</h4>{pooledProgress.length?<div className="mt-2 divide-y divide-white/[.06]">{pooledProgress.map(m=>{const f=fundById.get(m.fund_id);return <div key={m.fund_id+m.member_id} className="flex flex-wrap justify-between gap-2 py-2 text-xs"><span>{f?.name??"Dana"} · {m.member_id.slice(0,8)}</span><span className={m.status==="PAID"?"text-emerald-300":m.status==="OVERDUE"?"text-rose-300":"text-amber-300"}>{m.status} · {money(Number(m.paid_amount),f?.currency?.trim()??"IDR")} / {money(Number(m.committed_amount),f?.currency?.trim()??"IDR")}</span></div>})}</div>:<p className="muted mt-2 text-xs">Belum ada komitmen iuran.</p>}</div>
+          <div><h4 className="text-sm font-semibold">Riwayat iuran terbaru</h4>{pooledContributions.length?<div className="mt-2 divide-y divide-white/[.06]">{pooledContributions.map(c=>{const f=fundById.get(c.fund_id);return <div key={c.id} className="flex justify-between gap-2 py-2 text-xs"><span>{f?.name??"Dana"} · {c.contributor_id.slice(0,8)}<span className="muted block">{date(c.created_at)}{c.notes ? " · "+c.notes : ""}</span></span><span className="text-emerald-300">{money(Number(c.amount),f?.currency?.trim()??"IDR")}</span></div>})}</div>:<p className="muted mt-2 text-xs">Belum ada iuran tercatat.</p>}</div></div>
+        {pooledExpenses.length>0 && <div className="mt-5 border-t border-white/[.07] pt-4"><h4 className="text-sm font-semibold">Pengeluaran dana terbaru</h4><div className="mt-2 divide-y divide-white/[.06]">{pooledExpenses.map(e=>{const f=fundById.get(e.fund_id);return <div key={e.id} className="flex justify-between gap-2 py-2 text-xs"><span>{f?.name??"Dana"} · {e.description}<span className="muted block">{date(e.created_at)}</span></span><span>{money(Number(e.amount),f?.currency?.trim()??"IDR")}</span></div>})}</div></div>}
       </section>
 
       <section className="panel mt-6 p-5">
