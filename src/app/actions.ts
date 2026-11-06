@@ -130,6 +130,43 @@ export async function createBudgetAction(data: FormData) {
 }
 
 
+
+export async function createSavingsGoalAction(data: FormData) {
+  const workspace = field(data, "workspace_id");
+  const name = field(data, "name");
+  const target = field(data, "target_amount");
+  const account = field(data, "account_id");
+  const targetDate = field(data, "target_date") || null;
+  if (!workspace || !name || name.length > 80 || !/^\d+(\.\d{1,2})?$/.test(target) || Number(target) <= 0 || Number(target) > 999999999999999999 || !account || (targetDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(targetDate))) fail(workspace, "invalid_savings_goal");
+  const db = await createClient();
+  const { data: accountRow, error: accountError } = await db.from("financial_accounts").select("currency").eq("id", account).eq("workspace_id", workspace).single();
+  if (accountError || !accountRow) fail(workspace, "invalid_savings_goal");
+  const { error } = await db.rpc("create_savings_goal", {
+    target_workspace: workspace, goal_name: name, goal_target: target,
+    goal_currency: accountRow.currency, goal_account: account, goal_target_date: targetDate,
+  });
+  if (error) fail(workspace, "savings_goal_create_failed");
+  revalidatePath("/");
+  redirect("/?workspace=" + workspace);
+}
+
+export async function moveSavingsFundsAction(data: FormData) {
+  const workspace = field(data, "workspace_id");
+  const goal = field(data, "goal_id");
+  const movement = field(data, "movement_type");
+  const amount = field(data, "amount");
+  const account = field(data, "other_account");
+  if (!workspace || !goal || !["DEPOSIT", "WITHDRAWAL"].includes(movement) || !/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0 || Number(amount) > 999999999999999999 || !account) fail(workspace, "invalid_savings_movement");
+  const db = await createClient();
+  const { error } = await db.rpc("move_savings_funds", {
+    target_goal: goal, movement_kind: movement, movement_amount: amount,
+    other_account: account, request_key: randomUUID(),
+  });
+  if (error) fail(workspace, "savings_movement_failed");
+  revalidatePath("/");
+  redirect("/?workspace=" + workspace);
+}
+
 export async function createPooledFundAction(data: FormData) {
   const workspace = field(data, "workspace_id");
   const name = field(data, "name");
