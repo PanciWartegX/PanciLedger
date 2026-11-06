@@ -1,52 +1,63 @@
-import { ArrowDownLeft, ArrowUpRight, Bell, ChevronDown, CircleDollarSign, LayoutDashboard, Plus, Search, Settings2, ShieldCheck, Wallet, ArrowLeftRight, ChartNoAxesCombined } from "lucide-react";
+import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CircleDollarSign, LayoutDashboard, LogOut, Plus, ShieldCheck, Wallet } from "lucide-react";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { createAccountAction, createAndPostTransactionAction, createTransferAction, createWorkspaceAction, reverseTransactionAction, signOutAction } from "@/app/actions";
 
-const nav = [
-  { label: "Overview", icon: LayoutDashboard, active: true },
-  { label: "Transactions", icon: ArrowLeftRight },
-  { label: "Accounts", icon: Wallet },
-  { label: "Budgets", icon: ChartNoAxesCombined },
-];
+type Props = { searchParams: Promise<{ workspace?: string; error?: string }> };
+const money = (n: number, currency = "IDR") => new Intl.NumberFormat("id-ID", { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
+const date = (s: string) => new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(new Date(s));
 
-const transactions = [
-  { title: "Project payment", category: "Client revenue", date: "Today, 10:42", amount: "+ Rp 8.500.000", income: true, initials: "PP" },
-  { title: "Workspace supplies", category: "Operations", date: "Yesterday, 15:20", amount: "− Rp 1.250.000", income: false, initials: "WS" },
-  { title: "Monthly contribution", category: "Shared fund", date: "06 Nov 2026", amount: "+ Rp 750.000", income: true, initials: "MC" },
-];
+export default async function Home({ searchParams }: Props) {
+  const params = await searchParams;
+  const db = await createClient();
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) redirect("/login");
 
-function Metric({ label, value, note, icon: Icon, positive }: { label: string; value: string; note: string; icon: typeof Wallet; positive?: boolean }) {
-  return <div className="panel p-5">
-    <div className="flex items-center justify-between"><span className="muted text-sm">{label}</span><span className="rounded-xl bg-emerald-400/10 p-2 text-emerald-300"><Icon size={18}/></span></div>
-    <div className="mt-5 text-2xl font-semibold tracking-tight">{value}</div>
-    <div className="mt-2 text-xs"><span className={positive ? "text-emerald-300" : "muted"}>{note}</span></div>
-  </div>;
-}
+  const { data: memberships } = await db.from("workspace_members").select("workspace_id,role").eq("user_id", user.id);
+  const rows = memberships ?? [];
+  const ids = rows.map((m) => m.workspace_id);
+  const { data: spaces } = ids.length ? await db.from("workspaces").select("id,name").in("id", ids) : { data: [] as {id:string;name:string}[] };
+  const workspaces = spaces ?? [];
+  const active = workspaces.find((w) => w.id === params.workspace) ?? workspaces[0];
+  if (!active) return <main className="grid min-h-screen place-items-center px-5"><section className="panel w-full max-w-lg p-8"><Brand/><h1 className="mt-8 text-2xl font-semibold">Create your first workspace</h1><p className="muted mt-2 text-sm">A separate place for each set of accounts and members.</p><form action={createWorkspaceAction} className="mt-6 space-y-3"><input name="name" required maxLength={80} placeholder="Personal finance" className="field"/><button className="primary w-full"><Plus size={16}/> Create workspace</button></form><form action={signOutAction} className="mt-5"><button className="muted text-sm">Sign out</button></form></section></main>;
 
-export default function Home() {
+  const role = rows.find((m) => m.workspace_id === active.id)?.role ?? "VIEWER";
+  const canWrite = ["OWNER","ADMIN","TREASURER"].includes(role);
+  const [{ data: accounts }, { data: transactions }, { data: audit }] = await Promise.all([
+    db.from("workspace_account_balances").select("id,name,currency,current_balance,is_active").eq("workspace_id", active.id).order("created_at"),
+    db.from("financial_transactions").select("id,kind,amount,currency,description,occurred_at,direction").eq("workspace_id", active.id).eq("status", "POSTED").order("occurred_at", {ascending:false}).limit(12),
+    db.from("workspace_audit_log").select("id,action,created_at").eq("workspace_id", active.id).order("created_at", {ascending:false}).limit(6),
+  ]);
+  const accts = accounts ?? [];
+  const txs = transactions ?? [];
+  const total = accts.reduce((n,a) => n + Number(a.current_balance), 0);
+  const currency = accts[0]?.currency?.trim() || "IDR";
+  const income = txs.filter(t => t.direction === "IN" && t.kind !== "REVERSAL").reduce((n,t)=>n+Number(t.amount),0);
+  const expense = txs.filter(t => t.direction === "OUT" && t.kind !== "REVERSAL").reduce((n,t)=>n+Number(t.amount),0);
+  const activeAccounts = accts.filter(a=>a.is_active);
+
   return <main className="min-h-screen lg:flex">
-    <aside className="hidden w-64 shrink-0 border-r border-white/[.07] px-5 py-7 lg:flex lg:flex-col">
-      <div className="flex items-center gap-3 px-2"><div className="grid size-10 place-items-center rounded-xl bg-emerald-400 text-slate-950"><CircleDollarSign size={23}/></div><div><div className="font-semibold tracking-wide">PanciLedger</div><div className="muted text-xs">by PanciWartegX</div></div></div>
-      <div className="mt-10 px-2 text-[10px] font-semibold uppercase tracking-[.2em] text-slate-500">Workspace</div>
-      <button className="mt-3 flex w-full items-center justify-between rounded-xl border border-white/10 bg-white/[.04] p-3 text-left text-sm"><span><span className="block font-medium">Personal workspace</span><span className="muted mt-1 block text-xs">Owner access</span></span><ChevronDown size={16} className="muted"/></button>
-      <div className="mt-9 px-2 text-[10px] font-semibold uppercase tracking-[.2em] text-slate-500">Menu</div>
-      <nav className="mt-3 space-y-1">{nav.map(({label,icon:Icon,active})=><a key={label} href="#" className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm ${active ? "bg-emerald-400/10 font-medium text-emerald-300" : "text-slate-400 hover:bg-white/[.04] hover:text-slate-100"}`}><Icon size={18}/>{label}</a>)}</nav>
-      <div className="mt-auto rounded-2xl border border-emerald-400/15 bg-emerald-400/[.06] p-4"><div className="flex items-center gap-2 text-sm font-medium text-emerald-200"><ShieldCheck size={16}/> Your data, protected</div><p className="muted mt-2 text-xs leading-5">Workspace isolation and secure access controls are part of the foundation.</p></div>
-      <div className="mt-5 flex items-center gap-3 px-2 text-sm text-slate-400"><Settings2 size={17}/> Settings</div>
-    </aside>
+    <aside className="hidden w-64 shrink-0 border-r border-white/[.07] px-5 py-7 lg:flex lg:flex-col"><Brand/><div className="mt-10 text-[10px] uppercase tracking-[.2em] text-slate-500">Workspace</div><form action="/" className="mt-3 space-y-2"><select name="workspace" defaultValue={active.id} className="field">{workspaces.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select><button className="secondary w-full text-xs">Switch workspace</button></form><div className="mt-4 rounded-xl border border-white/10 p-3"><div className="text-sm font-medium">{active.name}</div><div className="muted mt-1 text-xs">{role} access</div></div><nav className="mt-8 space-y-4 text-sm text-slate-400"><div className="flex items-center gap-3 text-emerald-300"><LayoutDashboard size={17}/> Overview</div><div className="flex items-center gap-3"><Wallet size={17}/> Accounts</div><div className="flex items-center gap-3"><ArrowLeftRight size={17}/> Transactions</div></nav><div className="mt-auto rounded-xl border border-emerald-400/15 bg-emerald-400/[.05] p-4"><div className="flex items-center gap-2 text-sm text-emerald-200"><ShieldCheck size={16}/> RLS protected</div><p className="muted mt-2 text-xs">Workspace access is checked in PostgreSQL.</p></div><form action={signOutAction} className="mt-5"><button className="muted flex items-center gap-2 text-sm"><LogOut size={15}/> Sign out</button></form></aside>
     <section className="min-w-0 flex-1 px-5 py-6 md:px-8 lg:px-10">
-      <header className="flex items-center justify-between gap-4"><div><div className="muted text-xs">Friday, 7 November 2026</div><h1 className="mt-1 text-xl font-semibold">Good morning 👋</h1></div><div className="flex items-center gap-3"><button aria-label="Search" className="rounded-xl border border-white/10 p-2.5 text-slate-400"><Search size={18}/></button><button aria-label="Notifications" className="relative rounded-xl border border-white/10 p-2.5 text-slate-400"><Bell size={18}/><span className="absolute right-2 top-2 size-1.5 rounded-full bg-emerald-400"/></button><div className="grid size-10 place-items-center rounded-full bg-slate-700 text-sm font-semibold">PW</div></div></header>
-      <div className="mt-9 flex flex-wrap items-end justify-between gap-4"><div><div className="muted text-sm">Workspace overview</div><h2 className="mt-1 text-2xl font-semibold">Your finances at a glance</h2><p className="muted mt-2 text-sm">A clear picture of what comes in and goes out.</p></div><button className="flex items-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-emerald-950/30"><Plus size={17}/> Add transaction</button></div>
-      <div className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="Total balance" value="Rp 24.850.000" note="Across 3 accounts" icon={Wallet}/>
-        <Metric label="Total income" value="Rp 12.400.000" note="↑ 8.2% from last month" icon={ArrowDownLeft} positive/>
-        <Metric label="Total expenses" value="Rp 4.250.000" note="↓ 3.1% from last month" icon={ArrowUpRight}/>
-        <Metric label="Available budget" value="Rp 6.750.000" note="68% of monthly limit" icon={ChartNoAxesCombined} positive/>
+      <header className="flex items-center justify-between"><div><div className="muted text-xs">{user.email}</div><h1 className="mt-1 text-xl font-semibold">Workspace overview</h1></div><span className="rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-400">{role}</span></header>
+      {params.error && <p role="alert" className="mt-5 rounded-xl border border-rose-400/20 bg-rose-400/5 p-3 text-sm text-rose-200">Action failed: {params.error}. Check permissions and confirm database migrations are applied.</p>}
+      <div className="mt-8"><div className="muted text-sm">{active.name}</div><h2 className="mt-1 text-2xl font-semibold">Your finances at a glance</h2><p className="muted mt-2 text-sm">Live balances from posted ledger entries.</p></div>
+      <div className="mt-6 grid gap-4 sm:grid-cols-3"><Metric label="Total balance" value={money(total,currency)} note={`${accts.length} accounts`} icon="wallet"/><Metric label="Income · recent 12" value={money(income,currency)} note="Latest posted entries" icon="in"/><Metric label="Expenses · recent 12" value={money(expense,currency)} note="Latest posted entries" icon="out"/></div>
+      <div className="mt-6 grid gap-5 xl:grid-cols-2">
+        <section className="panel p-5"><h3 className="font-semibold">Accounts</h3><p className="muted mt-1 text-xs">Calculated balances</p>{accts.length ? <div className="mt-4 divide-y divide-white/[.06]">{accts.map(a=><div key={a.id} className="flex justify-between gap-3 py-3"><div><div className="text-sm font-medium">{a.name}</div><div className="muted text-xs">{a.currency} · {a.is_active?"Active":"Archived"}</div></div><div className="text-sm font-semibold">{money(Number(a.current_balance),a.currency.trim())}</div></div>)}</div>:<p className="muted mt-4 text-sm">No accounts yet.</p>}
+          {canWrite && <form action={createAccountAction} className="mt-5 grid gap-3 border-t border-white/[.07] pt-5 sm:grid-cols-2"><input type="hidden" name="workspace_id" value={active.id}/><input name="name" required maxLength={80} placeholder="Account name" className="field"/><input name="opening_balance" required inputMode="decimal" defaultValue="0" placeholder="Opening balance" className="field"/><select name="currency" className="field"><option value="IDR">IDR</option><option value="USD">USD</option><option value="MYR">MYR</option></select><button className="secondary"><Plus size={15}/> Create account</button></form>}
+        </section>
+        <section className="panel p-5"><h3 className="font-semibold">Recent transactions</h3><p className="muted mt-1 text-xs">Latest posted ledger activity</p>{txs.length?<div className="mt-4 divide-y divide-white/[.06]">{txs.map(t=><div key={t.id} className="flex items-start justify-between gap-2 py-3"><div className="min-w-0"><div className="truncate text-sm font-medium">{t.description}</div><div className="muted mt-1 text-xs">{t.kind} · {date(t.occurred_at)}</div></div><div className={`shrink-0 text-sm font-semibold ${t.direction==="IN"?"text-emerald-300":"text-slate-200"}`}>{t.direction==="IN"?"+":"−"} {money(Number(t.amount),t.currency.trim())}</div>{canWrite && !["REVERSAL","TRANSFER"].includes(t.kind) && <form action={reverseTransactionAction}><input type="hidden" name="workspace_id" value={active.id}/><input type="hidden" name="transaction_id" value={t.id}/><button className="muted text-[10px] underline">Reverse</button></form>}</div>)}</div>:<p className="muted mt-4 text-sm">No posted transactions yet.</p>}</section>
       </div>
-      <div className="mt-6 grid gap-5 xl:grid-cols-[1.55fr_1fr]">
-        <div className="panel p-5 md:p-6"><div className="flex items-center justify-between"><div><h3 className="font-semibold">Cash flow</h3><p className="muted mt-1 text-xs">Income vs expenses</p></div><button className="rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-300">Last 7 days <ChevronDown className="ml-2 inline" size={13}/></button></div><div className="mt-8 flex h-44 items-end justify-between gap-3 px-2">{[38,58,44,78,52,88,66].map((v,i)=><div key={i} className="flex h-full flex-1 flex-col justify-end gap-2"><div className="flex h-full items-end justify-center gap-1"><div className="w-2/5 rounded-t-md bg-emerald-400/80" style={{height:v+"%"}}/><div className="w-2/5 rounded-t-md bg-sky-400/60" style={{height:(v*.52)+"%"}}/></div><span className="muted text-center text-[10px]">{["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][i]}</span></div>)}</div><div className="mt-5 flex gap-5 text-xs text-slate-400"><span><i className="mr-2 inline-block size-2 rounded-full bg-emerald-400"/>Income</span><span><i className="mr-2 inline-block size-2 rounded-full bg-sky-400"/>Expenses</span></div></div>
-        <div className="panel p-5 md:p-6"><div className="flex items-center justify-between"><h3 className="font-semibold">Account balances</h3><a href="#" className="text-xs text-emerald-300">View all</a></div><div className="mt-5 space-y-5">{[{name:"Main wallet",type:"Cash",amount:"Rp 12.500.000",pct:"52%"},{name:"Bank account",type:"Savings",amount:"Rp 9.850.000",pct:"40%"},{name:"Emergency fund",type:"Reserve",amount:"Rp 2.500.000",pct:"8%"}].map((a)=><div key={a.name}><div className="flex items-center justify-between"><div><div className="text-sm font-medium">{a.name}</div><div className="muted mt-1 text-xs">{a.type}</div></div><div className="text-right text-sm font-medium">{a.amount}</div></div><div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/[.06]"><div className="h-full rounded-full bg-emerald-400" style={{width:a.pct}}/></div></div>)}</div></div>
-      </div>
-      <div className="panel mt-5 p-5 md:p-6"><div className="flex items-center justify-between"><div><h3 className="font-semibold">Recent transactions</h3><p className="muted mt-1 text-xs">Your latest workspace activity</p></div><a href="#" className="text-xs text-emerald-300">See all</a></div><div className="mt-5 divide-y divide-white/[.06]">{transactions.map(t=><div key={t.title} className="flex items-center justify-between gap-3 py-4 first:pt-0 last:pb-0"><div className="flex min-w-0 items-center gap-3"><div className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/[.05] text-xs font-semibold text-slate-300">{t.initials}</div><div className="min-w-0"><div className="truncate text-sm font-medium">{t.title}</div><div className="muted mt-1 text-xs">{t.category} · {t.date}</div></div></div><div className={`shrink-0 text-sm font-semibold ${t.income ? "text-emerald-300" : "text-slate-200"}`}>{t.amount}</div></div>)}</div></div>
-      <footer className="muted mt-8 flex flex-wrap justify-between gap-2 text-xs"><span>© 2026 PanciWartegX. All rights reserved.</span><span>Preview interface · Sample data only</span></footer>
+      {canWrite && <div className="mt-6 grid gap-5 xl:grid-cols-2">
+        <section id="new-transaction" className="panel p-5"><h3 className="font-semibold">New transaction</h3><p className="muted mt-1 text-xs">Draft then validated posting</p>{activeAccounts.length?<form action={createAndPostTransactionAction} className="mt-4 space-y-3"><input type="hidden" name="workspace_id" value={active.id}/><select name="account_id" className="field">{activeAccounts.map(a=><option key={a.id} value={a.id}>{a.name} · {a.currency}</option>)}</select><div className="grid grid-cols-2 gap-3"><select name="kind" className="field"><option value="INCOME">Income</option><option value="EXPENSE">Expense</option></select><input name="amount" required inputMode="decimal" placeholder="Amount" className="field"/></div><input name="description" required maxLength={240} placeholder="Description" className="field"/><button className="primary w-full">Save and post</button></form>:<p className="muted mt-4 text-sm">Create an active account first.</p>}</section>
+        <section className="panel p-5"><h3 className="font-semibold">Transfer funds</h3><p className="muted mt-1 text-xs">Two-sided transfer committed atomically</p>{activeAccounts.length>=2?<form action={createTransferAction} className="mt-4 space-y-3"><input type="hidden" name="workspace_id" value={active.id}/><select name="source_account" className="field">{activeAccounts.map(a=><option key={a.id} value={a.id}>{a.name} · {a.currency}</option>)}</select><select name="destination_account" className="field">{activeAccounts.map(a=><option key={a.id} value={a.id}>{a.name} · {a.currency}</option>)}</select><input name="amount" required inputMode="decimal" placeholder="Amount" className="field"/><input name="description" required maxLength={240} placeholder="Description" className="field"/><button className="secondary w-full"><ArrowLeftRight size={16}/> Transfer</button></form>:<p className="muted mt-4 text-sm">Create two active accounts in the same currency.</p>}</section>
+      </div>}
+      {["OWNER","ADMIN","AUDITOR"].includes(role) && <section className="panel mt-6 p-5"><h3 className="font-semibold">Audit activity</h3><div className="mt-4 space-y-3">{(audit??[]).map(e=><div key={e.id} className="flex justify-between gap-3 text-xs"><span>{e.action.replaceAll("_"," ")}</span><span className="muted">{date(e.created_at)}</span></div>)}{!audit?.length&&<p className="muted text-sm">No events recorded yet.</p>}</div></section>}
+      <footer className="muted mt-8 flex justify-between gap-3 text-xs"><span>© 2026 PanciWartegX. All rights reserved.</span><span>Supabase live data</span></footer>
     </section>
   </main>;
 }
+
+function Brand(){return <div className="flex items-center gap-3"><div className="grid size-10 place-items-center rounded-xl bg-emerald-400 text-slate-950"><CircleDollarSign size={23}/></div><div><div className="font-semibold">PanciLedger</div><div className="muted text-xs">by PanciWartegX</div></div></div>;}
+function Metric({label,value,note,icon}:{label:string;value:string;note:string;icon:"wallet"|"in"|"out"}){const Icon=icon==="wallet"?Wallet:icon==="in"?ArrowDownLeft:ArrowUpRight;return <div className="panel p-5"><div className="flex items-center justify-between"><span className="muted text-sm">{label}</span><span className="rounded-xl bg-emerald-400/10 p-2 text-emerald-300"><Icon size={18}/></span></div><div className="mt-5 text-xl font-semibold">{value}</div><div className="muted mt-2 text-xs">{note}</div></div>;}
