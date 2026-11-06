@@ -6,7 +6,7 @@ Copyright © 2026 PanciWartegX. All rights reserved.
 
 ## Current implementation
 
-The `develop` branch contains a Next.js App Router application with Supabase email/password authentication, server-side session refresh, multi-workspace dashboard, workspace roles, account creation, income/expense posting, atomic same-currency transfers, single-entry reversals, and workspace audit activity.
+The `main` branch contains a Next.js App Router application with Supabase email/password authentication, server-side session refresh, multi-workspace dashboard, workspace roles, account creation, income/expense posting, atomic same-currency transfers, single-entry reversals, and workspace audit activity.
 
 The application is still under development. Shared-fund pools, paired transfer reversals, budgets, savings goals, recurring transactions, reports/exports, notifications, account administration, and broader automated integration tests are not complete. Do not treat the current build as production-ready until the database migrations and live Supabase flows have been tested.
 
@@ -35,9 +35,9 @@ The publishable key is designed for browser use. It does not grant elevated data
 2. Set the Vercel project name to `panciledger` (the dashboard may normalize capitalization; the visible app branding remains **PanciLedger**).
 3. Set the Production Branch to `main`; use `develop` as a Preview branch.
 4. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to the **Preview** environment only at first.
-5. Add the Preview deployment URL to Supabase Auth Redirect URLs and configure the Site URL appropriately for the intended auth flow.
-6. Deploy a Preview and test sign-up, email confirmation, sign-in, workspace isolation, roles, account balances, transactions, transfers, reversals, and sign-out.
-7. Keep Production environment variables and Production deployment disabled until explicitly approved and all tests pass.
+5. Apply migrations `0001` through `0007` in filename order. The `0007` migration tightens public/anonymous grants and adds missing foreign-key indexes. Confirm that the Supabase migration history is reconciled before adopting automated CLI deployments; migrations `0001`–`0006` were initially applied through the SQL Editor and may not be recorded in migration history.\n6. Add the Preview deployment URL to Supabase Auth Redirect URLs and configure the Site URL appropriately for the intended auth flow.
+7. Deploy a Preview and test sign-up, email confirmation, sign-in, workspace isolation, roles, account balances, transactions, transfers, reversals, and sign-out.
+8. Keep Production environment variables and Production deployment disabled until explicitly approved and all tests pass.
 
 Vercel automatically detects Next.js; no custom build command is required. The expected build command is `npm run build`.
 
