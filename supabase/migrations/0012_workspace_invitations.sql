@@ -23,7 +23,7 @@ returns uuid language plpgsql security definer set search_path='' as $wi$
 declare actor uuid:=auth.uid(); actor_role public.workspace_role; token uuid;
 begin
  select m.role into actor_role from public.workspace_members m where m.workspace_id=target_workspace and m.user_id=actor;
- if actor is null or actor_role not in ('OWNER','ADMIN') then raise exception 'Insufficient workspace permissions' using errcode='42501'; end if;
+ if actor is null or actor_role is null or actor_role not in ('OWNER','ADMIN') then raise exception 'Insufficient workspace permissions' using errcode='42501'; end if;
  if target_email is null or char_length(trim(target_email)) not between 3 and 254 or target_email !~* '^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$' or target_role is null then raise exception 'Invalid invitation details' using errcode='22023'; end if;
  if target_role in ('OWNER','ADMIN') and actor_role<>'OWNER' then raise exception 'Only an owner can invite owners or admins' using errcode='42501'; end if;
  token:=gen_random_uuid();
