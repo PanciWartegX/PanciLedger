@@ -232,6 +232,12 @@ begin
   if tx.status <> 'DRAFT' or tx.kind in ('TRANSFER','REVERSAL') then
     raise exception 'Only income, expense or adjustment drafts can be posted here' using errcode = '23514';
   end if;
+  if tx.kind = 'INCOME' and tx.direction <> 'IN' then
+    raise exception 'Income must increase the account balance' using errcode = '23514';
+  end if;
+  if tx.kind = 'EXPENSE' and tx.direction <> 'OUT' then
+    raise exception 'Expense must decrease the account balance' using errcode = '23514';
+  end if;
 
   update public.financial_transactions
   set status = 'POSTED', posted_at = now()
