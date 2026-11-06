@@ -1,7 +1,7 @@
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CircleDollarSign, LayoutDashboard, LogOut, Plus, ShieldCheck, Wallet } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { createAccountAction, createAndPostTransactionAction, createTransferAction, createWorkspaceAction, reverseTransactionAction, signOutAction } from "@/app/actions";
+import { createAccountAction, createAndPostTransactionAction, createCashReconciliationAction, createTransferAction, createWorkspaceAction, reverseTransactionAction, signOutAction } from "@/app/actions";
 
 type Props = { searchParams: Promise<{ workspace?: string; error?: string }> };
 const money = (n: number, currency = "IDR") => new Intl.NumberFormat("id-ID", { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
@@ -24,7 +24,9 @@ const errorLabel = (code: string) => (({
   invalid_transfer: "Data transfer tidak valid",
   transfer_failed: "Gagal melakukan transfer",
   invalid_reversal: "Data pembalikan tidak valid",
-  reversal_failed: "Gagal membalikkan transaksi"
+  reversal_failed: "Gagal membalikkan transaksi",
+  invalid_reconciliation: "Data rekonsiliasi kas tidak valid",
+  reconciliation_failed: "Gagal menyimpan rekonsiliasi kas"
 } as Record<string, string>)[code] ?? "Terjadi kesalahan. Silakan coba lagi.");
 const currencyTotals = (entries: { currency: string; amount: number }[]) => {
   const totals = new Map<string, number>();
@@ -48,10 +50,11 @@ export default async function Home({ searchParams }: Props) {
 
   const role = rows.find((m) => m.workspace_id === active.id)?.role ?? "VIEWER";
   const canWrite = ["OWNER","ADMIN","TREASURER"].includes(role);
-  const [{ data: accounts }, { data: transactions }, { data: audit }] = await Promise.all([
+  const [{ data: accounts }, { data: transactions }, { data: audit }, { data: reconciliationRows }] = await Promise.all([
     db.from("workspace_account_balances").select("id,name,currency,current_balance,is_active").eq("workspace_id", active.id).order("created_at"),
     db.from("financial_transactions").select("id,kind,amount,currency,description,occurred_at,direction").eq("workspace_id", active.id).eq("status", "POSTED").order("occurred_at", {ascending:false}).limit(12),
     db.from("workspace_audit_log").select("id,action,created_at").eq("workspace_id", active.id).order("created_at", {ascending:false}).limit(6),
+    db.from("cash_reconciliations").select("id,account_id,expected_balance,counted_balance,difference,notes,created_at").eq("workspace_id", active.id).order("created_at", {ascending:false}).limit(8),
   ]);
   const accts = accounts ?? [];
   const txs = transactions ?? [];
@@ -59,6 +62,8 @@ export default async function Home({ searchParams }: Props) {
   const inflows = txs.filter(t => t.direction === "IN").map(t => ({ currency: t.currency, amount: Number(t.amount) }));
   const outflows = txs.filter(t => t.direction === "OUT").map(t => ({ currency: t.currency, amount: Number(t.amount) }));
   const activeAccounts = accts.filter(a=>a.is_active);
+  const reconciliations = reconciliationRows ?? [];
+  const accountById = new Map(accts.map(a => [a.id, a]));
 
   return <main className="min-h-screen lg:flex">
     <aside className="hidden w-64 shrink-0 border-r border-white/[.07] px-5 py-7 lg:flex lg:flex-col"><Brand/><div className="mt-10 text-[10px] uppercase tracking-[.2em] text-slate-500">Ruang kerja</div><form action="/" method="get" className="mt-3 space-y-2"><select name="workspace" defaultValue={active.id} className="field">{workspaces.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select><button className="secondary w-full text-xs">Ganti ruang kerja</button></form><form action={createWorkspaceAction} className="mt-3 flex gap-2"><input name="name" required maxLength={80} placeholder="Ruang kerja baru" className="field min-w-0 text-xs"/><button className="secondary shrink-0 text-xs"><Plus size={14}/></button></form><div className="mt-4 rounded-xl border border-white/10 p-3"><div className="text-sm font-medium">{active.name}</div><div className="muted mt-1 text-xs">{roleLabel(role)}</div></div><nav className="mt-8 space-y-4 text-sm text-slate-400"><div className="flex items-center gap-3 text-emerald-300"><LayoutDashboard size={17}/> Ringkasan</div><div className="flex items-center gap-3"><Wallet size={17}/> Akun</div><div className="flex items-center gap-3"><ArrowLeftRight size={17}/> Transaksi</div></nav><div className="mt-auto rounded-xl border border-emerald-400/15 bg-emerald-400/[.05] p-4"><div className="flex items-center gap-2 text-sm text-emerald-200"><ShieldCheck size={16}/> Dilindungi RLS</div><p className="muted mt-2 text-xs">Akses ruang kerja diperiksa langsung oleh PostgreSQL.</p></div><form action={signOutAction} className="mt-5"><button className="muted flex items-center gap-2 text-sm"><LogOut size={15}/> Keluar</button></form></aside>
@@ -78,6 +83,30 @@ export default async function Home({ searchParams }: Props) {
         <section id="new-transaction" className="panel p-5"><h3 className="font-semibold">Transaksi baru</h3><p className="muted mt-1 text-xs">Disiapkan lalu divalidasi sebelum dibukukan</p>{activeAccounts.length?<form action={createAndPostTransactionAction} className="mt-4 space-y-3"><input type="hidden" name="workspace_id" value={active.id}/><select name="account_id" className="field">{activeAccounts.map(a=><option key={a.id} value={a.id}>{a.name} · {a.currency}</option>)}</select><div className="grid grid-cols-2 gap-3"><select name="kind" className="field"><option value="INCOME">Pemasukan</option><option value="EXPENSE">Pengeluaran</option></select><input name="amount" required inputMode="decimal" placeholder="Jumlah" className="field"/></div><input name="description" required maxLength={240} placeholder="Keterangan" className="field"/><button className="primary w-full">Simpan dan bukukan</button></form>:<p className="muted mt-4 text-sm">Buat akun aktif terlebih dahulu.</p>}</section>
         <section className="panel p-5"><h3 className="font-semibold">Transfer dana</h3><p className="muted mt-1 text-xs">Transfer dua sisi diproses secara atomik.</p>{activeAccounts.length>=2?<form action={createTransferAction} className="mt-4 space-y-3"><input type="hidden" name="workspace_id" value={active.id}/><select name="source_account" className="field">{activeAccounts.map(a=><option key={a.id} value={a.id}>{a.name} · {a.currency}</option>)}</select><select name="destination_account" className="field">{activeAccounts.map(a=><option key={a.id} value={a.id}>{a.name} · {a.currency}</option>)}</select><input name="amount" required inputMode="decimal" placeholder="Jumlah" className="field"/><input name="description" required maxLength={240} placeholder="Keterangan" className="field"/><button className="secondary w-full"><ArrowLeftRight size={16}/> Transfer</button></form>:<p className="muted mt-4 text-sm">Buat dua akun aktif dengan mata uang yang sama.</p>}</section>
       </div>}
+      <section className="panel mt-6 p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div><h3 className="font-semibold">Rekonsiliasi kas</h3><p className="muted mt-1 text-xs">Bandingkan saldo buku dengan uang yang benar-benar dihitung. Catatan ini tidak mengubah saldo akun.</p></div>
+          <span className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400">{reconciliations.length} catatan terbaru</span>
+        </div>
+        {canWrite && activeAccounts.length > 0 && <form action={createCashReconciliationAction} className="mt-4 grid gap-3 border-b border-white/[.07] pb-5 sm:grid-cols-2">
+          <input type="hidden" name="workspace_id" value={active.id}/>
+          <select name="account_id" className="field">{activeAccounts.map(a=><option key={a.id} value={a.id}>{a.name} · {a.currency}</option>)}</select>
+          <input name="counted_balance" type="number" min="0" step="0.01" required inputMode="decimal" placeholder="Saldo hasil hitung fisik" className="field"/>
+          <input name="notes" maxLength={500} placeholder="Catatan (opsional)" className="field sm:col-span-2"/>
+          <button className="secondary sm:col-span-2">Simpan hasil rekonsiliasi</button>
+        </form>}
+        {reconciliations.length ? <div className="mt-3 divide-y divide-white/[.06]">
+          {reconciliations.map(r => {
+            const account = accountById.get(r.account_id);
+            const currency = account?.currency?.trim() ?? "IDR";
+            const difference = Number(r.difference);
+            return <div key={r.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+              <div className="min-w-0"><div className="text-sm font-medium">{account?.name ?? "Akun tidak tersedia"}</div><div className="muted mt-1 text-xs">{date(r.created_at)}{r.notes ? ` · ${r.notes}` : ""}</div><div className="muted mt-1 text-xs">Buku: {money(Number(r.expected_balance),currency)} · Hitung: {money(Number(r.counted_balance),currency)}</div></div>
+              <div className={`text-sm font-semibold ${difference === 0 ? "text-emerald-300" : "text-amber-300"}`}>{difference > 0 ? "+" : ""}{money(difference,currency)}</div>
+            </div>;
+          })}
+        </div> : <p className="muted mt-4 text-sm">Belum ada rekonsiliasi kas.</p>}
+      </section>
       {["OWNER","ADMIN","AUDITOR"].includes(role) && <section className="panel mt-6 p-5"><h3 className="font-semibold">Aktivitas audit</h3><div className="mt-4 space-y-3">{(audit??[]).map(e=><div key={e.id} className="flex justify-between gap-3 text-xs"><span>{actionLabel(e.action)}</span><span className="muted">{date(e.created_at)}</span></div>)}{!audit?.length&&<p className="muted text-sm">Belum ada aktivitas yang tercatat.</p>}</div></section>}
       <footer className="muted mt-8 flex justify-between gap-3 text-xs"><span>© 2026 PanciWartegX. Hak cipta dilindungi.</span><span>Data langsung dari Supabase</span></footer>
     </section>
