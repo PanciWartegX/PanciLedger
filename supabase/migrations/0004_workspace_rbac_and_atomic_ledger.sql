@@ -101,6 +101,14 @@ begin
   if assigned_role in ('OWNER', 'ADMIN') and actor_role <> 'OWNER' then
     raise exception 'Only an owner can assign owner or admin roles' using errcode = '42501';
   end if;
+  if actor_role = 'OWNER' and assigned_role <> 'OWNER' then
+    if exists (select 1 from public.workspace_members m
+               where m.workspace_id = target_workspace and m.user_id = target_user and m.role = 'OWNER')
+       and (select count(*) from public.workspace_members m
+            where m.workspace_id = target_workspace and m.role = 'OWNER') <= 1 then
+      raise exception 'A workspace must retain at least one owner' using errcode = '23514';
+    end if;
+  end if;
 
   insert into public.workspace_members(workspace_id, user_id, role)
   values (target_workspace, target_user, assigned_role)
@@ -269,6 +277,7 @@ begin
     raise exception 'Invalid transfer details' using errcode = '22023';
   end if;
 
+  perform pg_advisory_xact_lock(hashtextextended(request_key::text, 0));
   select transfer_id into existing_group
   from public.financial_transactions
   where workspace_id = target_workspace and idempotency_key = request_key;
@@ -332,8 +341,8 @@ begin
   if not public.has_workspace_role(original.workspace_id, array['OWNER','ADMIN','TREASURER']::public.workspace_role[]) then
     raise exception 'Insufficient workspace permissions' using errcode = '42501';
   end if;
-  if original.kind = 'TRANSFER' then
-    raise exception 'Reverse transfers through a dedicated paired-transfer reversal workflow' using errcode = '0A000';
+  if original.kind in ('TRANSFER', 'REVERSAL') then
+    raise exception 'This transaction type cannot be reversed through the single-entry reversal workflow' using errcode = '0A000';
   end if;
 
   select id into reversal_id from public.financial_transactions where reversal_of = target_transaction;
