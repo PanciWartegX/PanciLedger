@@ -1,7 +1,7 @@
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CircleDollarSign, LayoutDashboard, LogOut, Plus, ShieldCheck, Wallet } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { createAccountAction, createAndPostTransactionAction, createCashReconciliationAction, createTransferAction, createWorkspaceAction, reverseTransactionAction, signOutAction } from "@/app/actions";
+import { createAccountAction, createAndPostTransactionAction, createBudgetAction, createCashReconciliationAction, createTransferAction, createWorkspaceAction, reverseTransactionAction, signOutAction } from "@/app/actions";
 
 type Props = { searchParams: Promise<{ workspace?: string; error?: string }> };
 const money = (n: number, currency = "IDR") => new Intl.NumberFormat("id-ID", { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
@@ -26,7 +26,9 @@ const errorLabel = (code: string) => (({
   invalid_reversal: "Data pembalikan tidak valid",
   reversal_failed: "Gagal membalikkan transaksi",
   invalid_reconciliation: "Data rekonsiliasi kas tidak valid",
-  reconciliation_failed: "Gagal menyimpan rekonsiliasi kas"
+  reconciliation_failed: "Gagal menyimpan rekonsiliasi kas",
+  invalid_budget: "Data anggaran tidak valid",
+  budget_create_failed: "Gagal membuat anggaran"
 } as Record<string, string>)[code] ?? "Terjadi kesalahan. Silakan coba lagi.");
 const currencyTotals = (entries: { currency: string; amount: number }[]) => {
   const totals = new Map<string, number>();
@@ -50,11 +52,13 @@ export default async function Home({ searchParams }: Props) {
 
   const role = rows.find((m) => m.workspace_id === active.id)?.role ?? "VIEWER";
   const canWrite = ["OWNER","ADMIN","TREASURER"].includes(role);
-  const [{ data: accounts }, { data: transactions }, { data: audit }, { data: reconciliationRows }] = await Promise.all([
+  const [{ data: accounts }, { data: transactions }, { data: audit }, { data: reconciliationRows }, { data: budgetRows }, { data: budgetUsageRows }] = await Promise.all([
     db.from("workspace_account_balances").select("id,name,currency,current_balance,is_active").eq("workspace_id", active.id).order("created_at"),
     db.from("financial_transactions").select("id,kind,amount,currency,description,occurred_at,direction").eq("workspace_id", active.id).eq("status", "POSTED").order("occurred_at", {ascending:false}).limit(12),
     db.from("workspace_audit_log").select("id,action,created_at").eq("workspace_id", active.id).order("created_at", {ascending:false}).limit(6),
     db.from("cash_reconciliations").select("id,account_id,expected_balance,counted_balance,difference,notes,created_at").eq("workspace_id", active.id).order("created_at", {ascending:false}).limit(8),
+    db.from("workspace_budgets").select("id,name,amount,currency,period_start,period_end,account_id,is_active,created_at").eq("workspace_id", active.id).eq("is_active", true).order("period_start", {ascending:false}),
+    db.from("workspace_budget_usage").select("budget_id,spent").eq("workspace_id", active.id),
   ]);
   const accts = accounts ?? [];
   const txs = transactions ?? [];
@@ -63,6 +67,8 @@ export default async function Home({ searchParams }: Props) {
   const outflows = txs.filter(t => t.direction === "OUT").map(t => ({ currency: t.currency, amount: Number(t.amount) }));
   const activeAccounts = accts.filter(a=>a.is_active);
   const reconciliations = reconciliationRows ?? [];
+  const budgets = budgetRows ?? [];
+  const budgetSpent = new Map((budgetUsageRows ?? []).map((item) => [item.budget_id, Number(item.spent)]));
   const accountById = new Map(accts.map(a => [a.id, a]));
 
   return <main className="min-h-screen lg:flex">
@@ -107,6 +113,38 @@ export default async function Home({ searchParams }: Props) {
           })}
         </div> : <p className="muted mt-4 text-sm">Belum ada rekonsiliasi kas.</p>}
       </section>
+
+      <section className="panel mt-6 p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div><h3 className="font-semibold">Anggaran</h3><p className="muted mt-1 text-xs">Pantau pengeluaran yang sudah dibukukan selama periode anggaran.</p></div>
+          <span className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400">{budgets.length} anggaran aktif</span>
+        </div>
+        {canWrite && <form action={createBudgetAction} className="mt-4 grid gap-3 border-b border-white/[.07] pb-5 sm:grid-cols-2">
+          <input type="hidden" name="workspace_id" value={active.id}/>
+          <input name="name" required maxLength={80} placeholder="Nama anggaran, mis. Operasional" className="field"/>
+          <input name="amount" type="number" min="0.01" step="0.01" required placeholder="Batas anggaran" className="field"/>
+          <select name="currency" className="field"><option value="IDR">IDR</option><option value="USD">USD</option><option value="MYR">MYR</option></select>
+          <select name="account_id" className="field"><option value="">Semua akun dengan mata uang ini</option>{activeAccounts.map(a=><option key={a.id} value={a.id}>{a.name} · {a.currency}</option>)}</select>
+          <label className="muted text-xs">Mulai<input name="period_start" type="date" required className="field mt-1"/></label>
+          <label className="muted text-xs">Berakhir<input name="period_end" type="date" required className="field mt-1"/></label>
+          <button className="secondary sm:col-span-2"><Plus size={15}/> Buat anggaran</button>
+        </form>}
+        {budgets.length ? <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {budgets.map(b => {
+            const spent = budgetSpent.get(b.id) ?? 0;
+            const amount = Number(b.amount);
+            const percent = amount > 0 ? Math.min(100, Math.round((spent / amount) * 100)) : 0;
+            const over = spent > amount;
+            return <div key={b.id} className="rounded-xl border border-white/[.08] p-4">
+              <div className="flex items-start justify-between gap-3"><div><div className="text-sm font-medium">{b.name}</div><div className="muted mt-1 text-xs">{b.period_start} – {b.period_end} · {b.currency}</div></div><div className={`text-sm font-semibold ${over ? "text-rose-300" : "text-emerald-300"}`}>{percent}%</div></div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10"><div className={`h-full rounded-full ${over ? "bg-rose-400" : "bg-emerald-400"}`} style={{width:`${percent}%`}}/></div>
+              <div className="muted mt-2 flex justify-between gap-2 text-xs"><span>Terpakai: {money(spent,b.currency.trim())}</span><span>Batas: {money(amount,b.currency.trim())}</span></div>
+              {over && <p className="mt-2 text-xs text-rose-300">Pengeluaran melewati batas anggaran.</p>}
+            </div>;
+          })}
+        </div> : <p className="muted mt-4 text-sm">Belum ada anggaran aktif.</p>}
+      </section>
+
       {["OWNER","ADMIN","AUDITOR"].includes(role) && <section className="panel mt-6 p-5"><h3 className="font-semibold">Aktivitas audit</h3><div className="mt-4 space-y-3">{(audit??[]).map(e=><div key={e.id} className="flex justify-between gap-3 text-xs"><span>{actionLabel(e.action)}</span><span className="muted">{date(e.created_at)}</span></div>)}{!audit?.length&&<p className="muted text-sm">Belum ada aktivitas yang tercatat.</p>}</div></section>}
       <footer className="muted mt-8 flex justify-between gap-3 text-xs"><span>© 2026 PanciWartegX. Hak cipta dilindungi.</span><span>Data langsung dari Supabase</span></footer>
     </section>

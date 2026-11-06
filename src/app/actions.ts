@@ -106,6 +106,29 @@ export async function createCashReconciliationAction(data: FormData) {
   redirect(`/?workspace=${workspace}`);
 }
 
+export async function createBudgetAction(data: FormData) {
+  const workspace = field(data, "workspace_id");
+  const name = field(data, "name");
+  const amount = field(data, "amount");
+  const currency = field(data, "currency") || "IDR";
+  const account = field(data, "account_id") || null;
+  const start = field(data, "period_start");
+  const end = field(data, "period_end");
+  if (!workspace || !name || name.length > 80 || !/^[A-Z]{3}$/.test(currency)
+      || !/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0
+      || !/^\d{4}-\d{2}-\d{2}$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)
+      || start > end) fail(workspace, "invalid_budget");
+  const db = await createClient();
+  const { error } = await db.rpc("create_workspace_budget", {
+    target_workspace: workspace, budget_name: name, budget_amount: amount,
+    budget_currency: currency, target_account: account, period_start: start,
+    period_end: end, request_key: randomUUID(),
+  });
+  if (error) fail(workspace, "budget_create_failed");
+  revalidatePath("/");
+  redirect(`/?workspace=${workspace}`);
+}
+
 export async function signOutAction() {
   const db = await createClient();
   await db.auth.signOut();
