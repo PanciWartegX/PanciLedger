@@ -40,7 +40,7 @@ export async function createAndPostTransactionAction(data: FormData) {
   const kind = field(data, "kind");
   const amount = field(data, "amount");
   const description = field(data, "description");
-  if (!workspace || !account || !["INCOME", "EXPENSE"].includes(kind) || !/^\\d+(\\.\\d{1,2})?$/.test(amount) || Number(amount) <= 0 || !description || description.length > 240) fail(workspace, "invalid_transaction");
+  if (!workspace || !account || !["INCOME", "EXPENSE"].includes(kind) || !/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0 || !description || description.length > 240) fail(workspace, "invalid_transaction");
 
   const db = await createClient();
   const { error } = await db.rpc("create_and_post_transaction", {
