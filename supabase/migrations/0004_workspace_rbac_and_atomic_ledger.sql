@@ -95,7 +95,7 @@ begin
   from public.workspace_members m
   where m.workspace_id = target_workspace and m.user_id = auth.uid();
 
-  if actor_role not in ('OWNER', 'ADMIN') then
+  if actor_role is null or actor_role not in ('OWNER', 'ADMIN') then
     raise exception 'Insufficient workspace permissions' using errcode = '42501';
   end if;
   if assigned_role in ('OWNER', 'ADMIN') and actor_role <> 'OWNER' then
@@ -146,7 +146,7 @@ begin
   where workspace_id = target_workspace and user_id = target_user
   for update;
 
-  if actor_role not in ('OWNER', 'ADMIN') or target_role is null then
+  if actor_role is null or actor_role not in ('OWNER', 'ADMIN') or target_role is null then
     raise exception 'Insufficient permissions or member not found' using errcode = '42501';
   end if;
   if target_role in ('OWNER', 'ADMIN') and actor_role <> 'OWNER' then
