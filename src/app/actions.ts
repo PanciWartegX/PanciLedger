@@ -132,6 +132,19 @@ export async function createBudgetAction(data: FormData) {
 
 
 
+
+export async function markNotificationReadAction(data: FormData) {
+ const workspace=field(data,"workspace_id"),notification=field(data,"notification_id");
+ if(!workspace||!notification) fail(workspace,"invalid_notification");
+ const db=await createClient();
+ const {data:{user}}=await db.auth.getUser();
+ if(!user) redirect("/login");
+ const {error}=await db.from("notifications").update({read_at:new Date().toISOString()}).eq("id",notification).eq("workspace_id",workspace).eq("recipient_id",user.id);
+ if(error) fail(workspace,"notification_update_failed");
+ revalidatePath("/");
+ redirect("/?workspace="+workspace);
+}
+
 export async function createRecurringTransactionAction(data: FormData) {
  const workspace=field(data,"workspace_id"),name=field(data,"name"),kind=field(data,"kind"),account=field(data,"account_id"),amount=field(data,"amount"),description=field(data,"description"),cadence=field(data,"cadence"),interval=field(data,"interval_days"),firstRun=field(data,"first_run_at");
  const customDays=cadence==="CUSTOM"?Number(interval):null;

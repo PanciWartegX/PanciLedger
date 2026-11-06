@@ -1,7 +1,7 @@
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CircleDollarSign, LayoutDashboard, LogOut, Plus, ShieldCheck, Wallet } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { createAccountAction, createAndPostTransactionAction, createBudgetAction, createCashReconciliationAction, createRecurringTransactionAction, executeDueRecurringAction, createSavingsGoalAction, moveSavingsFundsAction, createPooledFundAction, createPooledFundCommitmentAction, createPooledFundContributionAction, createPooledFundExpenseAction, createTransferAction, createWorkspaceAction, reverseTransactionAction, signOutAction } from "@/app/actions";
+import { createAccountAction, createAndPostTransactionAction, createBudgetAction, createCashReconciliationAction, markNotificationReadAction, createRecurringTransactionAction, executeDueRecurringAction, createSavingsGoalAction, moveSavingsFundsAction, createPooledFundAction, createPooledFundCommitmentAction, createPooledFundContributionAction, createPooledFundExpenseAction, createTransferAction, createWorkspaceAction, reverseTransactionAction, signOutAction } from "@/app/actions";
 
 type Props = { searchParams: Promise<{ workspace?: string; error?: string }> };
 const money = (n: number, currency = "IDR") => new Intl.NumberFormat("id-ID", { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
@@ -43,7 +43,9 @@ const errorLabel = (code: string) => (({
   savings_movement_failed: "Gagal memproses perpindahan dana tabungan",
   invalid_recurring: "Data transaksi berulang tidak valid",
   recurring_create_failed: "Gagal membuat transaksi berulang",
-  recurring_execute_failed: "Gagal menjalankan transaksi yang jatuh tempo"
+  recurring_execute_failed: "Gagal menjalankan transaksi yang jatuh tempo",
+  invalid_notification: "Notifikasi tidak valid",
+  notification_update_failed: "Gagal memperbarui notifikasi"
 } as Record<string, string>)[code] ?? "Terjadi kesalahan. Silakan coba lagi.");
 const currencyTotals = (entries: { currency: string; amount: number }[]) => {
   const totals = new Map<string, number>();
@@ -67,7 +69,7 @@ export default async function Home({ searchParams }: Props) {
 
   const role = rows.find((m) => m.workspace_id === active.id)?.role ?? "VIEWER";
   const canWrite = ["OWNER","ADMIN","TREASURER"].includes(role);
-  const [{ data: accounts }, { data: transactions }, { data: audit }, { data: reconciliationRows }, { data: budgetRows }, { data: budgetUsageRows }, { data: pooledFundRows }, { data: pooledBalanceRows }, { data: pooledProgressRows }, { data: pooledContributionRows }, { data: pooledExpenseRows }, { data: savingsGoalRows }, { data: savingsProgressRows }, { data: savingsMovementRows }, { data: recurringRows }, { data: recurringLogRows }] = await Promise.all([
+  const [{ data: accounts }, { data: transactions }, { data: audit }, { data: reconciliationRows }, { data: budgetRows }, { data: budgetUsageRows }, { data: pooledFundRows }, { data: pooledBalanceRows }, { data: pooledProgressRows }, { data: pooledContributionRows }, { data: pooledExpenseRows }, { data: savingsGoalRows }, { data: savingsProgressRows }, { data: savingsMovementRows }, { data: recurringRows }, { data: recurringLogRows }, { data: notificationRows }] = await Promise.all([
     db.from("workspace_account_balances").select("id,name,currency,current_balance,is_active").eq("workspace_id", active.id).order("created_at"),
     db.from("financial_transactions").select("id,kind,amount,currency,description,occurred_at,direction").eq("workspace_id", active.id).eq("status", "POSTED").order("occurred_at", {ascending:false}).limit(12),
     db.from("workspace_audit_log").select("id,action,created_at").eq("workspace_id", active.id).order("created_at", {ascending:false}).limit(6),
@@ -84,6 +86,7 @@ export default async function Home({ searchParams }: Props) {
     db.from("savings_movements").select("id,goal_id,movement_type,amount,created_at,transfer_id").eq("workspace_id", active.id).order("created_at", {ascending:false}).limit(10),
     db.from("recurring_transactions").select("id,name,transaction_type,account_id,amount,description,cadence,interval_days,next_run_at,last_run_at,is_active").eq("workspace_id", active.id).eq("is_active", true).order("next_run_at"),
     db.from("recurring_execution_logs").select("id,recurring_transaction_id,scheduled_for,transaction_id,amount,executed_at").eq("workspace_id", active.id).order("executed_at", {ascending:false}).limit(10),
+    db.from("notifications").select("id,notification_type,title,body,created_at,read_at").eq("workspace_id", active.id).eq("recipient_id", user.id).order("created_at", {ascending:false}).limit(8),
   ]);
   const accts = accounts ?? [];
   const txs = transactions ?? [];
@@ -107,6 +110,8 @@ export default async function Home({ searchParams }: Props) {
   const recurringTemplates = recurringRows ?? [];
   const recurringLogs = recurringLogRows ?? [];
   const recurringById = new Map(recurringTemplates.map((r) => [r.id, r]));
+  const notifications = notificationRows ?? [];
+  const unreadNotifications = notifications.filter((n) => !n.read_at).length;
   const workspaceMembers = rows.filter((m) => m.workspace_id === active.id);
   const fundById = new Map(pooledFunds.map((f) => [f.id, f]));
   const accountById = new Map(accts.map(a => [a.id, a]));
@@ -156,6 +161,12 @@ export default async function Home({ searchParams }: Props) {
 
 
 
+
+
+      <section className="panel mt-6 p-5">
+        <div className="flex items-center justify-between gap-3"><div><h3 className="font-semibold">Notifikasi</h3><p className="muted mt-1 text-xs">Pembaruan transaksi dalam ruang kerja ini</p></div><span className="rounded-lg border border-white/10 px-3 py-1.5 text-xs">{unreadNotifications} belum dibaca</span></div>
+        {notifications.length?<div className="mt-3 divide-y divide-white/[.06]">{notifications.map(n=><div key={n.id} className="flex items-start justify-between gap-3 py-3"><div className="min-w-0"><div className="flex items-center gap-2"><span className={"h-2 w-2 rounded-full "+(n.read_at?"bg-slate-600":"bg-emerald-400")}/><span className="text-sm font-medium">{n.title}</span></div><p className="muted mt-1 text-xs">{n.body}</p><p className="muted mt-1 text-[10px]">{date(n.created_at)}</p></div>{!n.read_at&&<form action={markNotificationReadAction}><input type="hidden" name="workspace_id" value={active.id}/><input type="hidden" name="notification_id" value={n.id}/><button className="muted shrink-0 text-xs underline">Tandai dibaca</button></form>}</div>)}</div>:<p className="muted mt-4 text-sm">Belum ada notifikasi.</p>}
+      </section>
 
       <section className="panel mt-6 p-5">
         <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">Transaksi berulang</h3><p className="muted mt-1 text-xs">Template transaksi dengan pencatatan ledger idempoten. Eksekusi saat ini manual oleh bendahara; scheduler otomatis memerlukan konfigurasi server terpisah.</p></div><span className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400">{recurringTemplates.length} jadwal aktif</span></div>
