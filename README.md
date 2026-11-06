@@ -13,12 +13,27 @@ The `develop` branch contains the Next.js application shell, Supabase SSR client
 1. Use Node.js 20.9+.
 2. Run `npm install`.
 3. Copy `.env.example` to `.env.local`.
-4. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` from Supabase API settings.
+4. The Supabase project URL, publishable key, and JWKS discovery URL are prefilled in `.env.example`.
 5. Run `npm run dev`.
 
-Never commit `.env.local`. The publishable/anon key is intended for client use but must be paired with correct Row Level Security. Never expose the Supabase service-role key to browser code.
+The publishable key is intended for client initialization. It does **not** replace database authorization: every exposed table must have correct Row Level Security policies.
 
-Apply SQL migrations with the Supabase CLI only after review. Configure Supabase Auth Site URL and allowed redirect URLs for local and Preview deployments.
+## Supabase credentials
+
+- `NEXT_PUBLIC_SUPABASE_URL`: project URL; safe to include in client configuration.
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: publishable key; designed to be used by browser clients with RLS.
+- `SUPABASE_JWKS_URL`: public JWKS discovery endpoint.
+- `SUPABASE_SECRET_KEY`: privileged server-only credential. Keep it in local/deployment environment variables or a secrets manager. Never commit it, prefix it with `NEXT_PUBLIC_`, return it from an API route, or import it into browser code.
+
+The current application uses the publishable key for Supabase SSR/browser authentication. A secret-key client is intentionally not added until a reviewed server-only operation actually requires elevated privileges. Prefer user-scoped clients and RLS over bypassing RLS.
+
+Never commit `.env.local`. The repository's `.gitignore` excludes local environment files.
+
+## Supabase Auth setup
+
+Configure the Supabase Auth Site URL and allowed redirect URLs for local development and each Preview deployment. The application callback route is `/auth/callback`.
+
+Apply SQL migrations with the Supabase CLI only after review.
 
 ## Product invariants
 
