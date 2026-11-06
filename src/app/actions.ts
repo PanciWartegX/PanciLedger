@@ -129,6 +129,75 @@ export async function createBudgetAction(data: FormData) {
   redirect(`/?workspace=${workspace}`);
 }
 
+
+export async function createPooledFundAction(data: FormData) {
+  const workspace = field(data, "workspace_id");
+  const name = field(data, "name");
+  const target = field(data, "target_amount");
+  const currency = field(data, "currency") || "IDR";
+  const account = field(data, "account_id");
+  const targetDate = field(data, "target_date") || null;
+  if (!workspace || !name || name.length > 80 || !/^\d+(\.\d{1,2})?$/.test(target) || Number(target) <= 0
+      || Number(target) > 999999999999999999 || !/^[A-Z]{3}$/.test(currency) || !account
+      || (targetDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(targetDate))) fail(workspace, "invalid_pooled_fund");
+  const db = await createClient();
+  const { error } = await db.rpc("create_pooled_fund", {
+    target_workspace: workspace, fund_name: name, fund_target: target,
+    fund_currency: currency, target_account: account, fund_target_date: targetDate,
+    request_key: randomUUID(),
+  });
+  if (error) fail(workspace, "pooled_fund_create_failed");
+  revalidatePath("/");
+  redirect("/?workspace=" + workspace);
+}
+
+export async function createPooledFundCommitmentAction(data: FormData) {
+  const workspace = field(data, "workspace_id");
+  const fund = field(data, "fund_id");
+  const member = field(data, "member_id");
+  const amount = field(data, "amount");
+  if (!workspace || !fund || !member || !/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0 || Number(amount) > 999999999999999999) fail(workspace, "invalid_pooled_commitment");
+  const db = await createClient();
+  const { error } = await db.rpc("set_pooled_fund_commitment", {
+    target_fund: fund, target_member: member, commitment_amount: amount,
+  });
+  if (error) fail(workspace, "pooled_commitment_failed");
+  revalidatePath("/");
+  redirect("/?workspace=" + workspace);
+}
+
+export async function createPooledFundContributionAction(data: FormData) {
+  const workspace = field(data, "workspace_id");
+  const fund = field(data, "fund_id");
+  const amount = field(data, "amount");
+  const notes = field(data, "notes");
+  if (!workspace || !fund || !/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0 || Number(amount) > 999999999999999999 || notes.length > 240) fail(workspace, "invalid_pooled_contribution");
+  const db = await createClient();
+  const { error } = await db.rpc("record_pooled_fund_contribution", {
+    target_fund: fund, contribution_amount: amount, contribution_notes: notes,
+    request_key: randomUUID(),
+  });
+  if (error) fail(workspace, "pooled_contribution_failed");
+  revalidatePath("/");
+  redirect("/?workspace=" + workspace);
+}
+
+export async function createPooledFundExpenseAction(data: FormData) {
+  const workspace = field(data, "workspace_id");
+  const fund = field(data, "fund_id");
+  const amount = field(data, "amount");
+  const description = field(data, "description");
+  if (!workspace || !fund || !/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0 || Number(amount) > 999999999999999999 || !description || description.length > 240) fail(workspace, "invalid_pooled_expense");
+  const db = await createClient();
+  const { error } = await db.rpc("record_pooled_fund_expense", {
+    target_fund: fund, expense_amount: amount, expense_description: description,
+    request_key: randomUUID(),
+  });
+  if (error) fail(workspace, "pooled_expense_failed");
+  revalidatePath("/");
+  redirect("/?workspace=" + workspace);
+}
+
 export async function signOutAction() {
   const db = await createClient();
   await db.auth.signOut();
