@@ -134,7 +134,6 @@ export async function createPooledFundAction(data: FormData) {
   const workspace = field(data, "workspace_id");
   const name = field(data, "name");
   const target = field(data, "target_amount");
-  const currency = field(data, "currency") || "IDR";
   const account = field(data, "account_id");
   const targetDate = field(data, "target_date") || null;
   if (!workspace || !name || name.length > 80 || !/^\d+(\.\d{1,2})?$/.test(target) || Number(target) <= 0
