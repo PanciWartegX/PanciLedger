@@ -58,7 +58,7 @@ declare actor uuid:=auth.uid(); item public.recurring_transactions%rowtype; tx_i
 begin
  if actor is null or not public.has_workspace_role(target_workspace,array['OWNER','ADMIN','TREASURER']::public.workspace_role[]) then raise exception 'Insufficient workspace permissions' using errcode='42501'; end if;
  if max_items is null or max_items not between 1 and 50 then raise exception 'Batch size must be between 1 and 50' using errcode='22023'; end if;
- for item in select * from public.recurring_transactions r where r.workspace_id=target_workspace and r.is_active and r.next_run_at<=current_date order by r.next_run_at,r.created_at for update skip locked limit max_items loop
+ for item in select * from public.recurring_transactions r where r.workspace_id=target_workspace and r.is_active and r.next_run_at<=current_date order by r.next_run_at,r.created_at limit max_items for update skip locked loop
   tx_id:=public.create_and_post_transaction(target_workspace,item.account_id,item.transaction_type,item.amount,item.description,gen_random_uuid());
   insert into public.recurring_execution_logs(workspace_id,recurring_transaction_id,scheduled_for,transaction_id,amount,executed_by) values(target_workspace,item.id,item.next_run_at,tx_id,item.amount,actor);
   next_date:=case item.cadence when 'DAILY' then item.next_run_at+1 when 'WEEKLY' then item.next_run_at+7 when 'MONTHLY' then (item.next_run_at+interval '1 month')::date when 'YEARLY' then (item.next_run_at+interval '1 year')::date else item.next_run_at+item.interval_days end;
