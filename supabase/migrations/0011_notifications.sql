@@ -29,7 +29,7 @@ begin
    select new.workspace_id,m.user_id,
     case when new.kind='INCOME' then 'TRANSACTION_INCOME' when new.kind='EXPENSE' then 'TRANSACTION_EXPENSE' when new.kind='TRANSFER' then 'TRANSACTION_TRANSFER' else 'TRANSACTION_UPDATE' end,
     case when new.kind='INCOME' then 'Pemasukan baru' when new.kind='EXPENSE' then 'Pengeluaran baru' when new.kind='TRANSFER' then 'Transfer baru' else 'Transaksi diperbarui' end,
-    new.description||' · '||new.currency||' '||new.amount::text,
+    left(new.description,180)||' · '||new.currency||' '||new.amount::text,
     'financial_transaction',new.id
    from public.workspace_members m where m.workspace_id=new.workspace_id;
   end if;

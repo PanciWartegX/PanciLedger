@@ -15,6 +15,7 @@ create table public.pooled_funds (
  constraint pooled_funds_workspace_id_id_key unique(workspace_id,id),
  constraint pooled_funds_idempotency unique(workspace_id,request_key)
 );
+create unique index pooled_funds_account_unique on public.pooled_funds(workspace_id,account_id);
 create index pooled_funds_workspace_active_idx on public.pooled_funds(workspace_id,is_active,created_at desc);
 
 create table public.pooled_fund_commitments (
