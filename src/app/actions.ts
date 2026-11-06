@@ -131,6 +131,28 @@ export async function createBudgetAction(data: FormData) {
 
 
 
+
+export async function createRecurringTransactionAction(data: FormData) {
+ const workspace=field(data,"workspace_id"),name=field(data,"name"),kind=field(data,"kind"),account=field(data,"account_id"),amount=field(data,"amount"),description=field(data,"description"),cadence=field(data,"cadence"),interval=field(data,"interval_days"),firstRun=field(data,"first_run_at");
+ const customDays=cadence==="CUSTOM"?Number(interval):null;
+ if(!workspace||!name||name.length>80||!["INCOME","EXPENSE"].includes(kind)||!account||!/^\d+(\.\d{1,2})?$/.test(amount)||Number(amount)<=0||Number(amount)>999999999999999999||!description||description.length>240||!["DAILY","WEEKLY","MONTHLY","YEARLY","CUSTOM"].includes(cadence)||!/^\d{4}-\d{2}-\d{2}$/.test(firstRun)||(cadence==="CUSTOM"&&(!Number.isInteger(customDays)||customDays<1||customDays>365))) fail(workspace,"invalid_recurring");
+ const db=await createClient();
+ const {error}=await db.rpc("create_recurring_transaction",{target_workspace:workspace,template_name:name,transaction_type:kind,target_account:account,template_amount:amount,template_description:description,template_cadence:cadence,custom_interval_days:customDays,first_run_date:firstRun});
+ if(error) fail(workspace,"recurring_create_failed");
+ revalidatePath("/");
+ redirect("/?workspace="+workspace);
+}
+
+export async function executeDueRecurringAction(data: FormData) {
+ const workspace=field(data,"workspace_id");
+ if(!workspace) fail(workspace,"invalid_recurring");
+ const db=await createClient();
+ const {error}=await db.rpc("execute_due_recurring",{target_workspace:workspace,max_items:20});
+ if(error) fail(workspace,"recurring_execute_failed");
+ revalidatePath("/");
+ redirect("/?workspace="+workspace);
+}
+
 export async function createSavingsGoalAction(data: FormData) {
   const workspace = field(data, "workspace_id");
   const name = field(data, "name");

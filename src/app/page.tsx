@@ -1,7 +1,7 @@
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CircleDollarSign, LayoutDashboard, LogOut, Plus, ShieldCheck, Wallet } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { createAccountAction, createAndPostTransactionAction, createBudgetAction, createCashReconciliationAction, createSavingsGoalAction, moveSavingsFundsAction, createPooledFundAction, createPooledFundCommitmentAction, createPooledFundContributionAction, createPooledFundExpenseAction, createTransferAction, createWorkspaceAction, reverseTransactionAction, signOutAction } from "@/app/actions";
+import { createAccountAction, createAndPostTransactionAction, createBudgetAction, createCashReconciliationAction, createRecurringTransactionAction, executeDueRecurringAction, createSavingsGoalAction, moveSavingsFundsAction, createPooledFundAction, createPooledFundCommitmentAction, createPooledFundContributionAction, createPooledFundExpenseAction, createTransferAction, createWorkspaceAction, reverseTransactionAction, signOutAction } from "@/app/actions";
 
 type Props = { searchParams: Promise<{ workspace?: string; error?: string }> };
 const money = (n: number, currency = "IDR") => new Intl.NumberFormat("id-ID", { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
@@ -40,7 +40,10 @@ const errorLabel = (code: string) => (({
   invalid_savings_goal: "Data target tabungan tidak valid",
   savings_goal_create_failed: "Gagal membuat target tabungan",
   invalid_savings_movement: "Data setoran atau penarikan tidak valid",
-  savings_movement_failed: "Gagal memproses perpindahan dana tabungan"
+  savings_movement_failed: "Gagal memproses perpindahan dana tabungan",
+  invalid_recurring: "Data transaksi berulang tidak valid",
+  recurring_create_failed: "Gagal membuat transaksi berulang",
+  recurring_execute_failed: "Gagal menjalankan transaksi yang jatuh tempo"
 } as Record<string, string>)[code] ?? "Terjadi kesalahan. Silakan coba lagi.");
 const currencyTotals = (entries: { currency: string; amount: number }[]) => {
   const totals = new Map<string, number>();
@@ -64,7 +67,7 @@ export default async function Home({ searchParams }: Props) {
 
   const role = rows.find((m) => m.workspace_id === active.id)?.role ?? "VIEWER";
   const canWrite = ["OWNER","ADMIN","TREASURER"].includes(role);
-  const [{ data: accounts }, { data: transactions }, { data: audit }, { data: reconciliationRows }, { data: budgetRows }, { data: budgetUsageRows }, { data: pooledFundRows }, { data: pooledBalanceRows }, { data: pooledProgressRows }, { data: pooledContributionRows }, { data: pooledExpenseRows }, { data: savingsGoalRows }, { data: savingsProgressRows }, { data: savingsMovementRows }] = await Promise.all([
+  const [{ data: accounts }, { data: transactions }, { data: audit }, { data: reconciliationRows }, { data: budgetRows }, { data: budgetUsageRows }, { data: pooledFundRows }, { data: pooledBalanceRows }, { data: pooledProgressRows }, { data: pooledContributionRows }, { data: pooledExpenseRows }, { data: savingsGoalRows }, { data: savingsProgressRows }, { data: savingsMovementRows }, { data: recurringRows }, { data: recurringLogRows }] = await Promise.all([
     db.from("workspace_account_balances").select("id,name,currency,current_balance,is_active").eq("workspace_id", active.id).order("created_at"),
     db.from("financial_transactions").select("id,kind,amount,currency,description,occurred_at,direction").eq("workspace_id", active.id).eq("status", "POSTED").order("occurred_at", {ascending:false}).limit(12),
     db.from("workspace_audit_log").select("id,action,created_at").eq("workspace_id", active.id).order("created_at", {ascending:false}).limit(6),
@@ -79,6 +82,8 @@ export default async function Home({ searchParams }: Props) {
     db.from("savings_goals").select("id,name,target_amount,currency,account_id,target_date,is_active,created_at").eq("workspace_id", active.id).eq("is_active", true).order("created_at", {ascending:false}),
     db.from("savings_goal_progress").select("goal_id,total_deposits,total_withdrawals,balance").eq("workspace_id", active.id),
     db.from("savings_movements").select("id,goal_id,movement_type,amount,created_at,transfer_id").eq("workspace_id", active.id).order("created_at", {ascending:false}).limit(10),
+    db.from("recurring_transactions").select("id,name,transaction_type,account_id,amount,description,cadence,interval_days,next_run_at,last_run_at,is_active").eq("workspace_id", active.id).eq("is_active", true).order("next_run_at"),
+    db.from("recurring_execution_logs").select("id,recurring_transaction_id,scheduled_for,transaction_id,amount,executed_at").eq("workspace_id", active.id).order("executed_at", {ascending:false}).limit(10),
   ]);
   const accts = accounts ?? [];
   const txs = transactions ?? [];
@@ -99,6 +104,9 @@ export default async function Home({ searchParams }: Props) {
   const savingsProgress = new Map((savingsProgressRows ?? []).map((item) => [item.goal_id, item]));
   const savingsMovements = savingsMovementRows ?? [];
   const savingsGoalById = new Map(savingsGoals.map((g) => [g.id, g]));
+  const recurringTemplates = recurringRows ?? [];
+  const recurringLogs = recurringLogRows ?? [];
+  const recurringById = new Map(recurringTemplates.map((r) => [r.id, r]));
   const workspaceMembers = rows.filter((m) => m.workspace_id === active.id);
   const fundById = new Map(pooledFunds.map((f) => [f.id, f]));
   const accountById = new Map(accts.map(a => [a.id, a]));
@@ -147,6 +155,15 @@ export default async function Home({ searchParams }: Props) {
       </section>
 
 
+
+
+      <section className="panel mt-6 p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">Transaksi berulang</h3><p className="muted mt-1 text-xs">Template transaksi dengan pencatatan ledger idempoten. Eksekusi saat ini manual oleh bendahara; scheduler otomatis memerlukan konfigurasi server terpisah.</p></div><span className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400">{recurringTemplates.length} jadwal aktif</span></div>
+        {canWrite && activeAccounts.length>0 && <form action={createRecurringTransactionAction} className="mt-4 grid gap-2 border-b border-white/[.07] pb-5 sm:grid-cols-2"><input type="hidden" name="workspace_id" value={active.id}/><input name="name" required maxLength={80} placeholder="Nama jadwal" className="field"/><select name="kind" className="field"><option value="EXPENSE">Pengeluaran</option><option value="INCOME">Pemasukan</option></select><select name="account_id" required className="field">{activeAccounts.map(a=><option key={a.id} value={a.id}>{a.name} · {a.currency}</option>)}</select><input name="amount" type="number" min="0.01" step="0.01" required placeholder="Nominal" className="field"/><input name="description" required maxLength={240} placeholder="Keterangan transaksi" className="field"/><select name="cadence" className="field"><option value="DAILY">Harian</option><option value="WEEKLY">Mingguan</option><option value="MONTHLY">Bulanan</option><option value="YEARLY">Tahunan</option><option value="CUSTOM">Interval khusus</option></select><input name="interval_days" type="number" min="1" max="365" placeholder="Interval hari (khusus)" className="field"/><label className="muted text-xs">Tanggal eksekusi pertama<input name="first_run_at" type="date" required className="field mt-1"/></label><button className="secondary sm:col-span-2"><Plus size={15}/> Buat jadwal berulang</button></form>}
+        {canWrite && recurringTemplates.some(r=>r.next_run_at<=new Date().toISOString().slice(0,10)) && <form action={executeDueRecurringAction} className="mt-4"><input type="hidden" name="workspace_id" value={active.id}/><button className="secondary w-full">Jalankan transaksi jatuh tempo (maks. 20)</button></form>}
+        {recurringTemplates.length>0?<div className="mt-4 divide-y divide-white/[.06]">{recurringTemplates.map(r=><div key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-3"><div><div className="text-sm font-medium">{r.name}</div><div className="muted mt-1 text-xs">{r.transaction_type==="EXPENSE"?"Pengeluaran":"Pemasukan"} · {r.cadence==="CUSTOM"?"Setiap "+r.interval_days+" hari":({DAILY:"Harian",WEEKLY:"Mingguan",MONTHLY:"Bulanan",YEARLY:"Tahunan"} as Record<string,string>)[r.cadence]} · Berikutnya {r.next_run_at}</div></div><div className="text-right text-sm font-semibold">{money(Number(r.amount),accountById.get(r.account_id)?.currency?.trim()??"IDR")}</div></div>)}</div>:<p className="muted mt-4 text-sm">Belum ada jadwal transaksi berulang.</p>}
+        {recurringLogs.length>0 && <div className="mt-5 border-t border-white/[.07] pt-4"><h4 className="text-sm font-semibold">Eksekusi terakhir</h4><div className="mt-2 divide-y divide-white/[.06]">{recurringLogs.map(log=><div key={log.id} className="flex justify-between gap-2 py-2 text-xs"><span>{recurringById.get(log.recurring_transaction_id)?.name??"Jadwal"}<span className="muted block">Periode {log.scheduled_for} · {date(log.executed_at)}</span></span><span>{money(Number(log.amount),accountById.get(recurringById.get(log.recurring_transaction_id)?.account_id)?.currency?.trim()??"IDR")}</span></div>)}</div></div>}
+      </section>
 
       <section className="panel mt-6 p-5">
         <div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">Target tabungan</h3><p className="muted mt-1 text-xs">Setoran dan penarikan memindahkan saldo antar-akun melalui transaksi transfer ledger.</p></div><span className="rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400">{savingsGoals.length} target aktif</span></div>
