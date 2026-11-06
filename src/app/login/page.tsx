@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 export default function LoginPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
-  const [password, setKata sandi] = useState("");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -18,7 +18,7 @@ export default function LoginPage() {
     try {
       const supabase = createClient();
       if (mode === "signin") {
-        const { error } = await supabase.auth.signInWithKata sandi({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw new Error("Email atau kata sandi tidak sesuai. Periksa kembali lalu coba lagi.");
         const next = new URLSearchParams(window.location.search).get("next");
         const target = next ? new URL(next, window.location.origin) : new URL("/", window.location.origin);
@@ -54,7 +54,7 @@ export default function LoginPage() {
         <div className="text-center"><h1 className="text-2xl font-semibold">{mode === "signin" ? "Selamat datang kembali" : "Buat akun PanciLedger"}</h1><p className="muted mt-2 text-sm">Akses aman ke ruang kerja keuanganmu.</p></div>
         <form onSubmit={submit} className="mt-7 space-y-4">
           <label className="block text-sm text-slate-300">Alamat email<input required type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 outline-none focus:border-emerald-400" placeholder="you@example.com"/></label>
-          <label className="block text-sm text-slate-300">Kata sandi<input required minLength={8} type="password" autoComplete={mode === "signin" ? "current-password" : "new-password"} value={password} onChange={e=>setKata sandi(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 outline-none focus:border-emerald-400" placeholder="Minimal 8 karakter"/></label>
+          <label className="block text-sm text-slate-300">Kata sandi<input required minLength={8} type="password" autoComplete={mode === "signin" ? "current-password" : "new-password"} value={password} onChange={e=>setPassword(e.target.value)} className="mt-2 w-full rounded-xl border border-white/10 bg-slate-950/60 px-4 py-3 outline-none focus:border-emerald-400" placeholder="Minimal 8 karakter"/></label>
           {message && <p role="status" className="rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-3 text-sm text-emerald-200">{message}</p>}
           <button disabled={busy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-60">{busy && <LoaderCircle className="animate-spin" size={17}/>} {mode === "signin" ? "Masuk" : "Daftar akun"}</button>
         </form>
