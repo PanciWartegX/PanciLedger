@@ -162,10 +162,11 @@ export async function createSavingsGoalAction(data: FormData) {
   if (!workspace || !name || name.length > 80 || !/^\d+(\.\d{1,2})?$/.test(target) || Number(target) <= 0 || Number(target) > 999999999999999999 || !account || (targetDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(targetDate))) fail(workspace, "invalid_savings_goal");
   const db = await createClient();
   const { data: accountRow, error: accountError } = await db.from("financial_accounts").select("currency").eq("id", account).eq("workspace_id", workspace).single();
-  if (accountError || !accountRow) fail(workspace, "invalid_savings_goal");
+  const accountCurrency = accountRow?.currency;
+  if (accountError || !accountCurrency) fail(workspace, "invalid_savings_goal");
   const { error } = await db.rpc("create_savings_goal", {
     target_workspace: workspace, goal_name: name, goal_target: target,
-    goal_currency: accountRow.currency, goal_account: account, goal_target_date: targetDate,
+    goal_currency: accountCurrency!, goal_account: account, goal_target_date: targetDate,
   });
   if (error) fail(workspace, "savings_goal_create_failed");
   revalidatePath("/");
@@ -200,10 +201,11 @@ export async function createPooledFundAction(data: FormData) {
       || (targetDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(targetDate))) fail(workspace, "invalid_pooled_fund");
   const db = await createClient();
   const { data: accountRow, error: accountError } = await db.from("financial_accounts").select("currency").eq("id", account).eq("workspace_id", workspace).single();
-  if (accountError || !accountRow) fail(workspace, "invalid_pooled_fund");
+  const accountCurrency = accountRow?.currency;
+  if (accountError || !accountCurrency) fail(workspace, "invalid_pooled_fund");
   const { error } = await db.rpc("create_pooled_fund", {
     target_workspace: workspace, fund_name: name, fund_target: target,
-    fund_currency: accountRow.currency, target_account: account, fund_target_date: targetDate,
+    fund_currency: accountCurrency!, target_account: account, fund_target_date: targetDate,
     request_key: randomUUID(),
   });
   if (error) fail(workspace, "pooled_fund_create_failed");
