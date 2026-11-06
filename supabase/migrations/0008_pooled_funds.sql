@@ -36,6 +36,7 @@ create table public.pooled_fund_contributions (
  workspace_id uuid not null,
  fund_id uuid not null,
  contributor_id uuid not null,
+ recorded_by uuid not null references auth.users(id) on delete restrict,
  amount numeric(20,2) not null check (amount > 0 and amount <= 999999999999999999),
  notes text check (notes is null or char_length(notes) <= 240),
  transaction_id uuid not null unique references public.financial_transactions(id) on delete restrict,
@@ -124,23 +125,24 @@ begin
  return new_id;
 end; $$;
 
-create or replace function public.record_pooled_fund_contribution(target_fund uuid,contribution_amount numeric,contribution_notes text,request_key uuid)
+create or replace function public.record_pooled_fund_contribution(target_fund uuid,target_member uuid,contribution_amount numeric,contribution_notes text,request_key uuid)
 returns uuid language plpgsql security definer set search_path='' as $$
 declare f public.pooled_funds%rowtype; actor uuid:=auth.uid(); tx_id uuid; contribution_id uuid; existing public.pooled_fund_contributions%rowtype;
 begin
  select * into f from public.pooled_funds where id=target_fund and is_active for update;
- if not found or actor is null or not public.is_workspace_member(f.workspace_id) then raise exception 'Fund not found or workspace membership required' using errcode='42501'; end if;
+ if not found or actor is null or not public.has_workspace_role(f.workspace_id,array['OWNER','ADMIN','TREASURER']::public.workspace_role[]) then raise exception 'Fund not found or treasury permission required' using errcode='42501'; end if;
+ if target_member is null or not exists(select 1 from public.workspace_members m where m.workspace_id=f.workspace_id and m.user_id=target_member) then raise exception 'Contributor must be a workspace member' using errcode='22023'; end if;
  if contribution_amount is null or contribution_amount<=0 or contribution_amount>999999999999999999 or (contribution_notes is not null and char_length(contribution_notes)>240) or request_key is null then raise exception 'Invalid contribution details' using errcode='22023'; end if;
  perform pg_advisory_xact_lock(hashtextextended(request_key::text,0));
  select * into existing from public.pooled_fund_contributions c where c.workspace_id=f.workspace_id and c.request_key=record_pooled_fund_contribution.request_key;
  if found then
-  if existing.fund_id<>f.id or existing.contributor_id<>actor or existing.amount<>contribution_amount or existing.notes is distinct from nullif(trim(contribution_notes),'') then raise exception 'Idempotency payload mismatch' using errcode='22023'; end if;
+  if existing.fund_id<>f.id or existing.contributor_id<>target_member or existing.recorded_by<>actor or existing.amount<>contribution_amount or existing.notes is distinct from nullif(trim(contribution_notes),'') then raise exception 'Idempotency payload mismatch' using errcode='22023'; end if;
   return existing.id;
  end if;
  insert into public.financial_transactions(workspace_id,account_id,kind,status,amount,currency,description,idempotency_key,created_by,direction,posted_at)
  values(f.workspace_id,f.account_id,'INCOME','POSTED',contribution_amount,f.currency,coalesce(nullif(trim(contribution_notes),''),'Iuran dana: '||f.name),request_key,actor,'IN',now()) returning id into tx_id;
- insert into public.pooled_fund_contributions(workspace_id,fund_id,contributor_id,amount,notes,transaction_id,request_key)
- values(f.workspace_id,f.id,actor,contribution_amount,nullif(trim(contribution_notes),''),tx_id,request_key) returning id into contribution_id;
+ insert into public.pooled_fund_contributions(workspace_id,fund_id,contributor_id,recorded_by,amount,notes,transaction_id,request_key)
+ values(f.workspace_id,f.id,target_member,actor,contribution_amount,nullif(trim(contribution_notes),''),tx_id,request_key) returning id into contribution_id;
  insert into public.workspace_audit_log(workspace_id,actor_id,action,entity_type,entity_id,details) values(f.workspace_id,actor,'POOLED_FUND_CONTRIBUTION_RECORDED','pooled_fund_contribution',contribution_id,jsonb_build_object('fund_id',f.id,'amount',contribution_amount,'transaction_id',tx_id));
  return contribution_id;
 end; $$;
@@ -170,9 +172,9 @@ end; $$;
 
 revoke all on function public.create_pooled_fund(uuid,text,numeric,char,uuid,date,uuid) from public,anon;
 revoke all on function public.set_pooled_fund_commitment(uuid,uuid,numeric) from public,anon;
-revoke all on function public.record_pooled_fund_contribution(uuid,numeric,text,uuid) from public,anon;
+revoke all on function public.record_pooled_fund_contribution(uuid,uuid,numeric,text,uuid) from public,anon;
 revoke all on function public.record_pooled_fund_expense(uuid,numeric,text,uuid) from public,anon;
 grant execute on function public.create_pooled_fund(uuid,text,numeric,char,uuid,date,uuid) to authenticated;
 grant execute on function public.set_pooled_fund_commitment(uuid,uuid,numeric) to authenticated;
-grant execute on function public.record_pooled_fund_contribution(uuid,numeric,text,uuid) to authenticated;
+grant execute on function public.record_pooled_fund_contribution(uuid,uuid,numeric,text,uuid) to authenticated;
 grant execute on function public.record_pooled_fund_expense(uuid,numeric,text,uuid) to authenticated;

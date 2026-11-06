@@ -138,12 +138,14 @@ export async function createPooledFundAction(data: FormData) {
   const account = field(data, "account_id");
   const targetDate = field(data, "target_date") || null;
   if (!workspace || !name || name.length > 80 || !/^\d+(\.\d{1,2})?$/.test(target) || Number(target) <= 0
-      || Number(target) > 999999999999999999 || !/^[A-Z]{3}$/.test(currency) || !account
+      || Number(target) > 999999999999999999 || !account
       || (targetDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(targetDate))) fail(workspace, "invalid_pooled_fund");
   const db = await createClient();
+  const { data: accountRow, error: accountError } = await db.from("financial_accounts").select("currency").eq("id", account).eq("workspace_id", workspace).single();
+  if (accountError || !accountRow) fail(workspace, "invalid_pooled_fund");
   const { error } = await db.rpc("create_pooled_fund", {
     target_workspace: workspace, fund_name: name, fund_target: target,
-    fund_currency: currency, target_account: account, fund_target_date: targetDate,
+    fund_currency: accountRow.currency, target_account: account, fund_target_date: targetDate,
     request_key: randomUUID(),
   });
   if (error) fail(workspace, "pooled_fund_create_failed");
@@ -169,12 +171,13 @@ export async function createPooledFundCommitmentAction(data: FormData) {
 export async function createPooledFundContributionAction(data: FormData) {
   const workspace = field(data, "workspace_id");
   const fund = field(data, "fund_id");
+  const member = field(data, "member_id");
   const amount = field(data, "amount");
   const notes = field(data, "notes");
-  if (!workspace || !fund || !/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0 || Number(amount) > 999999999999999999 || notes.length > 240) fail(workspace, "invalid_pooled_contribution");
+  if (!workspace || !fund || !member || !/^\d+(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0 || Number(amount) > 999999999999999999 || notes.length > 240) fail(workspace, "invalid_pooled_contribution");
   const db = await createClient();
   const { error } = await db.rpc("record_pooled_fund_contribution", {
-    target_fund: fund, contribution_amount: amount, contribution_notes: notes,
+    target_fund: fund, target_member: member, contribution_amount: amount, contribution_notes: notes,
     request_key: randomUUID(),
   });
   if (error) fail(workspace, "pooled_contribution_failed");
