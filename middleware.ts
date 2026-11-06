@@ -24,11 +24,15 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isLogin = request.nextUrl.pathname.startsWith("/login");
-  if (!user && !isLogin) {
+  const pathname = request.nextUrl.pathname;
+  const isLogin = pathname === "/login";
+  const isAuthCallback = pathname === "/auth/callback";
+
+  // Email confirmation must reach the callback route before a session exists.
+  if (!user && !isLogin && !isAuthCallback) {
     const target = request.nextUrl.clone();
     target.pathname = "/login";
-    target.searchParams.set("next", request.nextUrl.pathname);
+    target.searchParams.set("next", pathname);
     return NextResponse.redirect(target);
   }
 
