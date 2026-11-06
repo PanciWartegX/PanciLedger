@@ -1,6 +1,7 @@
 import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CircleDollarSign, LayoutDashboard, LogOut, Plus, ShieldCheck, Wallet } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { FinanceCharts } from "@/components/finance-charts";
 import { createAccountAction, createAndPostTransactionAction, createBudgetAction, createCashReconciliationAction, markNotificationReadAction, createRecurringTransactionAction, executeDueRecurringAction, createSavingsGoalAction, moveSavingsFundsAction, createPooledFundAction, createPooledFundCommitmentAction, createPooledFundContributionAction, createPooledFundExpenseAction, createTransferAction, createWorkspaceAction, reverseTransactionAction, signOutAction } from "@/app/actions";
 
 type Props = { searchParams: Promise<{ workspace?: string; error?: string }> };
@@ -69,7 +70,7 @@ export default async function Home({ searchParams }: Props) {
 
   const role = rows.find((m) => m.workspace_id === active.id)?.role ?? "VIEWER";
   const canWrite = ["OWNER","ADMIN","TREASURER"].includes(role);
-  const [{ data: accounts }, { data: transactions }, { data: audit }, { data: reconciliationRows }, { data: budgetRows }, { data: budgetUsageRows }, { data: pooledFundRows }, { data: pooledBalanceRows }, { data: pooledProgressRows }, { data: pooledContributionRows }, { data: pooledExpenseRows }, { data: savingsGoalRows }, { data: savingsProgressRows }, { data: savingsMovementRows }, { data: recurringRows }, { data: recurringLogRows }, { data: notificationRows }] = await Promise.all([
+  const [{ data: accounts }, { data: transactions }, { data: audit }, { data: reconciliationRows }, { data: budgetRows }, { data: budgetUsageRows }, { data: pooledFundRows }, { data: pooledBalanceRows }, { data: pooledProgressRows }, { data: pooledContributionRows }, { data: pooledExpenseRows }, { data: savingsGoalRows }, { data: savingsProgressRows }, { data: savingsMovementRows }, { data: recurringRows }, { data: recurringLogRows }, { data: notificationRows }, { data: trendRows }] = await Promise.all([
     db.from("workspace_account_balances").select("id,name,currency,current_balance,is_active").eq("workspace_id", active.id).order("created_at"),
     db.from("financial_transactions").select("id,kind,amount,currency,description,occurred_at,direction").eq("workspace_id", active.id).eq("status", "POSTED").order("occurred_at", {ascending:false}).limit(12),
     db.from("workspace_audit_log").select("id,action,created_at").eq("workspace_id", active.id).order("created_at", {ascending:false}).limit(6),
@@ -87,6 +88,7 @@ export default async function Home({ searchParams }: Props) {
     db.from("recurring_transactions").select("id,name,transaction_type,account_id,amount,description,cadence,interval_days,next_run_at,last_run_at,is_active").eq("workspace_id", active.id).eq("is_active", true).order("next_run_at"),
     db.from("recurring_execution_logs").select("id,recurring_transaction_id,scheduled_for,transaction_id,amount,executed_at").eq("workspace_id", active.id).order("executed_at", {ascending:false}).limit(10),
     db.from("notifications").select("id,notification_type,title,body,created_at,read_at").eq("workspace_id", active.id).eq("recipient_id", user.id).order("created_at", {ascending:false}).limit(8),
+    db.from("financial_transactions").select("occurred_at,direction,amount,currency").eq("workspace_id", active.id).eq("status", "POSTED").gte("occurred_at", new Date(Date.now()-365*24*60*60*1000).toISOString()).order("occurred_at", {ascending:true}).limit(5000),
   ]);
   const accts = accounts ?? [];
   const txs = transactions ?? [];
@@ -111,6 +113,17 @@ export default async function Home({ searchParams }: Props) {
   const recurringLogs = recurringLogRows ?? [];
   const recurringById = new Map(recurringTemplates.map((r) => [r.id, r]));
   const notifications = notificationRows ?? [];
+  const trendMap = new Map<string, {currency:string; months:Map<string,{income:number;expense:number}>}>();
+  for (const row of trendRows ?? []) {
+    const currency = row.currency.trim();
+    const monthKey = row.occurred_at.slice(0,7);
+    if (!trendMap.has(currency)) trendMap.set(currency,{currency,months:new Map()});
+    const entry=trendMap.get(currency)!;
+    if (!entry.months.has(monthKey)) entry.months.set(monthKey,{income:0,expense:0});
+    const point=entry.months.get(monthKey)!;
+    if(row.direction==="IN") point.income+=Number(row.amount); else point.expense+=Number(row.amount);
+  }
+  const trendSeries=[...trendMap.values()].map(item=>({currency:item.currency,points:[...item.months.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([month,v])=>({month:new Intl.DateTimeFormat("id-ID",{month:"short",year:"2-digit"}).format(new Date(month+"-01T00:00:00")),income:v.income,expense:v.expense}))}));
   const unreadNotifications = notifications.filter((n) => !n.read_at).length;
   const workspaceMembers = rows.filter((m) => m.workspace_id === active.id);
   const fundById = new Map(pooledFunds.map((f) => [f.id, f]));
@@ -124,6 +137,7 @@ export default async function Home({ searchParams }: Props) {
       {params.error && <p role="alert" className="mt-5 rounded-xl border border-rose-400/20 bg-rose-400/5 p-3 text-sm text-rose-200">Aksi gagal: {errorLabel(params.error)}. Periksa hak akses dan penerapan migrasi database.</p>}
       <div className="mt-8"><div className="muted text-sm">{active.name}</div><h2 className="mt-1 text-2xl font-semibold">Ringkasan keuanganmu</h2><p className="muted mt-2 text-sm">Saldo terkini berdasarkan transaksi yang sudah dibukukan.</p></div>
       <div className="mt-6 grid gap-4 sm:grid-cols-3"><Metric label="Total saldo" value={currencyTotals(totalByCurrency)} note={`${accts.length} akun · dikelompokkan berdasarkan mata uang`} icon="wallet"/><Metric label="Uang masuk · 12 transaksi terbaru" value={currencyTotals(inflows)} note="Termasuk transfer dan pembatalan transaksi" icon="in"/><Metric label="Uang keluar · 12 transaksi terbaru" value={currencyTotals(outflows)} note="Termasuk transfer dan pembatalan transaksi" icon="out"/></div>
+      <FinanceCharts series={trendSeries}/>
       <div className="mt-6 grid gap-5 xl:grid-cols-2">
         <section className="panel p-5"><h3 className="font-semibold">Akun</h3><p className="muted mt-1 text-xs">Saldo terhitung otomatis</p>{accts.length ? <div className="mt-4 divide-y divide-white/[.06]">{accts.map(a=><div key={a.id} className="flex justify-between gap-3 py-3"><div><div className="text-sm font-medium">{a.name}</div><div className="muted text-xs">{a.currency} · {a.is_active?"Aktif":"Diarsipkan"}</div></div><div className="text-sm font-semibold">{money(Number(a.current_balance),a.currency.trim())}</div></div>)}</div>:<p className="muted mt-4 text-sm">Belum ada akun.</p>}
           {canWrite && <form action={createAccountAction} className="mt-5 grid gap-3 border-t border-white/[.07] pt-5 sm:grid-cols-2"><input type="hidden" name="workspace_id" value={active.id}/><input name="name" required maxLength={80} placeholder="Nama akun" className="field"/><input name="opening_balance" required inputMode="decimal" defaultValue="0" placeholder="Saldo awal" className="field"/><select name="currency" className="field"><option value="IDR">IDR</option><option value="USD">USD</option><option value="MYR">MYR</option></select><button className="secondary"><Plus size={15}/> Buat akun</button></form>}
