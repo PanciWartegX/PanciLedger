@@ -28,7 +28,15 @@ const errorLabel = (code: string) => (({
   invalid_reconciliation: "Data rekonsiliasi kas tidak valid",
   reconciliation_failed: "Gagal menyimpan rekonsiliasi kas",
   invalid_budget: "Data anggaran tidak valid",
-  budget_create_failed: "Gagal membuat anggaran"
+  budget_create_failed: "Gagal membuat anggaran",
+  invalid_pooled_fund: "Data dana bersama tidak valid",
+  pooled_fund_create_failed: "Gagal membuat dana bersama",
+  invalid_pooled_commitment: "Data komitmen iuran tidak valid",
+  pooled_commitment_failed: "Gagal menyimpan komitmen anggota",
+  invalid_pooled_contribution: "Data iuran tidak valid",
+  pooled_contribution_failed: "Gagal mencatat iuran",
+  invalid_pooled_expense: "Data pengeluaran dana tidak valid",
+  pooled_expense_failed: "Gagal membukukan pengeluaran dana"
 } as Record<string, string>)[code] ?? "Terjadi kesalahan. Silakan coba lagi.");
 const currencyTotals = (entries: { currency: string; amount: number }[]) => {
   const totals = new Map<string, number>();
