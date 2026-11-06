@@ -22,7 +22,8 @@ grant update(read_at) on public.notifications to authenticated;
 create or replace function public.notify_workspace_transaction()
 returns trigger language plpgsql security definer set search_path='' as $notify$
 begin
- if new.status='POSTED' and (tg_op='INSERT' or old.status is distinct from new.status) then
+ if new.status='POSTED' then
+  if tg_op='UPDATE' and old.status='POSTED' then return new; end if;
   if new.kind<>'TRANSFER' or not exists(select 1 from public.financial_transactions t where t.transfer_id=new.transfer_id and t.id<>new.id) then
    insert into public.notifications(workspace_id,recipient_id,notification_type,title,body,entity_type,entity_id)
    select new.workspace_id,m.user_id,
