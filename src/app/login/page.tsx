@@ -13,6 +13,7 @@ export default function LoginPage() {
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [nextPath, setNextPath] = useState("/");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -96,6 +97,12 @@ export default function LoginPage() {
       if (displayName.trim().length < 2 || displayName.trim().length > 80) {
         throw new Error("Nama lengkap harus 2–80 karakter.");
       }
+      if (password.length < 8 || password.length > 256) {
+        throw new Error("Kata sandi harus terdiri dari 8–256 karakter.");
+      }
+      if (password !== confirmPassword) {
+        throw new Error("Konfirmasi kata sandi tidak sama.");
+      }
       if (!turnstileSiteKey || !captchaToken) throw new Error("CAPTCHA belum siap. Selesaikan verifikasi terlebih dahulu.");
       const signupClient = createSignupClient();
       const { data, error } = await signupClient.auth.signUp({
@@ -176,6 +183,10 @@ export default function LoginPage() {
               <label className="block text-sm text-slate-300">Kata sandi
                 <input required minLength={8} maxLength={256} type="password" autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} className="field mt-2" placeholder="Minimal 8 karakter"/>
               </label>
+              <label className="block text-sm text-slate-300">Konfirmasi kata sandi
+                <input required minLength={8} maxLength={256} type="password" autoComplete="new-password" value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} className="field mt-2" placeholder="Ulangi kata sandi"/>
+              </label>
+              {confirmPassword && password !== confirmPassword && <p role="alert" className="text-xs text-rose-300">Konfirmasi kata sandi belum sama.</p>}
               {captchaWidget}
               <input type="hidden" name="captchaToken" value={captchaToken}/>
               {message && <p role="status" className="rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-3 text-sm text-emerald-200">{message}</p>}
