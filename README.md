@@ -8,6 +8,20 @@ Antarmuka menggunakan Bahasa Indonesia dengan tema navy gelap dan aksen emerald.
 
 PanciLedger aktif dikembangkan pada branch `main`. Fitur keuangan inti dan modul tambahan telah digabung melalui [PR #2](https://github.com/PanciWartegX/PanciLedger/pull/2).
 
+### Akun pengguna dan akses workspace
+
+- Pengguna mendaftar sendiri dari halaman website dengan nama tampilan, username unik, email, dan kata sandi.
+- Email digunakan untuk verifikasi serta pemulihan akun. Setelah akun terverifikasi, pengguna dapat masuk menggunakan username atau email beserta kata sandi.
+- Kredensial dikelola Supabase Auth. PanciLedger tidak menyimpan kata sandi sendiri.
+- Username dipetakan ke akun Auth melalui Edge Function `username-login`; service-role key hanya digunakan di sisi Edge Function dan tidak dikirim ke browser.
+- Undangan workspace dikirim sebagai tautan yang terikat pada email. Penerima membuat akun sendiri, memverifikasi email, lalu menerima undangan.
+- Profil menyimpan nama tampilan dan username. RLS membatasi profil yang dapat dilihat ke pengguna sendiri dan rekan satu workspace.
+- Menu antarmuka mengikuti role OWNER, ADMIN, TREASURER, AUDITOR, MEMBER, dan VIEWER. Hak tulis tetap divalidasi di database/RPC, bukan hanya dengan menyembunyikan tombol.
+
+### Navigasi aplikasi
+
+Fitur dipisahkan menjadi menu Dashboard, Akun Keuangan, Transaksi, Keuangan & Anggaran, Perencanaan, Notifikasi, Anggota & Akses, Laporan & Audit, dan Profil. Menu administrasi workspace hanya tersedia untuk OWNER/ADMIN; menu laporan dan audit tersedia untuk OWNER/ADMIN/AUDITOR; menu keuangan tersedia untuk OWNER/ADMIN/TREASURER/AUDITOR. Menu lain menampilkan data sesuai keanggotaan workspace, sedangkan operasi tulis tetap dibatasi oleh role di database.
+
 ### Fitur yang tersedia
 
 - Autentikasi email/kata sandi Supabase dan sesi sisi server.
