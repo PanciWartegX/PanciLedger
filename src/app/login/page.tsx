@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { signInWithUsernameAction } from "@/app/auth-actions";
 
 export default function LoginPage() {
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<"signin" | "signup" | "reset">("signin");
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
@@ -23,10 +23,35 @@ export default function LoginPage() {
       setMessage("Username/email atau kata sandi tidak sesuai. Pastikan email sudah diverifikasi.");
     } else if (params.get("error") === "logout_failed") {
       setMessage("Logout belum berhasil. Silakan coba lagi.");
+    } else if (params.get("error") === "auth_callback") {
+      setMessage("Tautan verifikasi atau pemulihan tidak valid atau sudah kedaluwarsa. Minta tautan baru.");
     } else if (params.get("logged_out") === "1") {
       setMessage("Kamu berhasil keluar dari PanciLedger.");
     }
   }, []);
+
+  async function requestPasswordReset(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setMessage("");
+    try {
+      if (!email.trim() || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email.trim())) {
+        throw new Error("Masukkan alamat email yang valid.");
+      }
+      const supabase = createClient();
+      const callback = new URL("/auth/callback", window.location.origin);
+      callback.searchParams.set("next", "/reset-password");
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+        redirectTo: callback.toString(),
+      });
+      if (error) throw new Error("Permintaan belum dapat diproses. Periksa email dan coba lagi.");
+      setMessage("Jika email terdaftar, tautan pemulihan akan dikirim. Periksa kotak masuk dan folder spam.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Permintaan pemulihan gagal.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function signup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -90,10 +115,11 @@ export default function LoginPage() {
           <label className="block text-sm text-slate-300">Kata sandi
             <input required name="password" minLength={8} maxLength={256} type="password" autoComplete="current-password" className="field mt-2" placeholder="Kata sandi"/>
           </label>
+          <div className="text-right"><button type="button" onClick={()=>{setMode("reset");setMessage("");}} className="text-xs text-emerald-300 underline">Lupa kata sandi?</button></div>
           <input type="hidden" name="next" value={nextPath}/>
           {message && <p role="status" className="rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-3 text-sm text-emerald-200">{message}</p>}
           <button type="submit" className="primary w-full">Masuk</button>
-        </form> : <form onSubmit={signup} className="mt-7 space-y-4">
+        </form> : mode === "signup" ? <form onSubmit={signup} className="mt-7 space-y-4">
           <label className="block text-sm text-slate-300">Nama lengkap
             <input required minLength={2} maxLength={80} autoComplete="name" value={displayName} onChange={e=>setDisplayName(e.target.value)} className="field mt-2" placeholder="Nama yang akan ditampilkan"/>
           </label>
@@ -109,8 +135,14 @@ export default function LoginPage() {
           </label>
           {message && <p role="status" className="rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-3 text-sm text-emerald-200">{message}</p>}
           <button type="submit" disabled={busy} className="primary flex w-full items-center justify-center gap-2 disabled:opacity-60">{busy && <LoaderCircle className="animate-spin" size={17}/>} Daftar akun</button>
+        </form> : <form onSubmit={requestPasswordReset} className="mt-7 space-y-4">
+          <label className="block text-sm text-slate-300">Email akun
+            <input required type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} className="field mt-2" placeholder="you@example.com"/>
+          </label>
+          {message && <p role="status" className="rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-3 text-sm text-emerald-200">{message}</p>}
+          <button type="submit" disabled={busy} className="primary flex w-full items-center justify-center gap-2 disabled:opacity-60">{busy && <LoaderCircle className="animate-spin" size={17}/>} Kirim tautan pemulihan</button>
         </form>}
-        <div className="muted mt-5 text-center text-sm">{mode === "signin" ? "Belum punya akun?" : "Sudah punya akun?"} <button type="button" onClick={()=>{setMode(mode === "signin" ? "signup" : "signin");setMessage("");}} className="font-medium text-emerald-300">{mode === "signin" ? "Daftar akun" : "Masuk"}</button></div>
+        <div className="muted mt-5 text-center text-sm">{mode === "signin" ? "Belum punya akun?" : mode === "signup" ? "Sudah punya akun?" : "Ingat kata sandi?"} <button type="button" onClick={()=>{setMode(mode === "signin" ? "signup" : "signin");setMessage("");}} className="font-medium text-emerald-300">{mode === "signin" ? "Daftar akun" : "Masuk"}</button></div>
       </div>
       <p className="muted mt-5 flex items-center justify-center gap-2 text-xs"><ShieldCheck size={14}/> Dilindungi oleh autentikasi Supabase</p>
       <p className="muted mt-8 text-center text-xs">© 2026 PanciWartegX. Hak cipta dilindungi.</p>
