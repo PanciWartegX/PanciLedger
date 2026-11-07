@@ -20,20 +20,19 @@ export async function signInWithUsernameAction(data: FormData) {
   }
 
   const supabase = await createClient();
-  const { data: resolvedEmail, error: lookupError } = await supabase.rpc(
-    "resolve_auth_email_for_login",
-    { login_identifier: identifier, login_password: password }
-  );
+  const { data: sessionData, error: loginError } = await supabase.functions.invoke("username-login", {
+    body: { identifier, password },
+  });
 
-  if (lookupError || typeof resolvedEmail !== "string" || !resolvedEmail) {
+  if (loginError || !sessionData?.access_token || !sessionData?.refresh_token) {
     redirect("/login?error=invalid_credentials");
   }
 
-  const { error } = await supabase.auth.signInWithPassword({
-    email: resolvedEmail,
-    password,
+  const { error: sessionError } = await supabase.auth.setSession({
+    access_token: sessionData.access_token,
+    refresh_token: sessionData.refresh_token,
   });
 
-  if (error) redirect("/login?error=invalid_credentials");
+  if (sessionError) redirect("/login?error=invalid_credentials");
   redirect(next);
 }
