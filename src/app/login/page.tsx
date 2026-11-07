@@ -24,7 +24,12 @@ export default function LoginPage() {
         const target = next ? new URL(next, window.location.origin) : new URL("/", window.location.origin);
         window.location.assign(target.origin === window.location.origin ? `${target.pathname}${target.search}${target.hash}` : "/");
       } else {
-        const emailRedirectTo = new URL("/auth/callback?next=%2F", window.location.origin).toString();
+        const next = new URLSearchParams(window.location.search).get("next");
+        const candidate = next ? new URL(next, window.location.origin) : new URL("/", window.location.origin);
+        const safeNext = candidate.origin === window.location.origin ? `${candidate.pathname}${candidate.search}${candidate.hash}` : "/";
+        const callback = new URL("/auth/callback", window.location.origin);
+        callback.searchParams.set("next", safeNext);
+        const emailRedirectTo = callback.toString();
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
@@ -32,7 +37,7 @@ export default function LoginPage() {
         });
         if (error) throw new Error("Pendaftaran gagal. Periksa format email dan pastikan kata sandi minimal 8 karakter.");
         if (data.session) {
-          window.location.assign("/");
+          window.location.assign(safeNext);
           return;
         }
         setMessage("Akun berhasil dibuat. Periksa email untuk mengonfirmasi alamat emailmu.");

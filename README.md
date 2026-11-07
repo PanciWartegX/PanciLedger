@@ -1,62 +1,93 @@
 # PanciLedger
 
-**PanciWartegX** — pengelolaan keuangan dalam beberapa ruang kerja.
+**PanciWartegX** — aplikasi pengelolaan keuangan untuk beberapa ruang kerja.
 
-Hak cipta © 2026 PanciWartegX. Seluruh hak dilindungi.
+Antarmuka menggunakan Bahasa Indonesia dengan tema navy gelap dan aksen emerald. Target domain produksi: **https://panciledger.vercel.app**.
 
 ## Status pengembangan
 
-Branch `main` berisi aplikasi Next.js App Router dengan autentikasi email/kata sandi Supabase, pembaruan sesi di sisi server, dashboard multi-ruang-kerja, pembuatan ruang kerja, pengaturan peran anggota, pembuatan akun keuangan, pencatatan pemasukan dan pengeluaran secara atomik, transfer antar-akun bermata uang sama, pembalikan transaksi tunggal, serta aktivitas audit ruang kerja.
+PanciLedger masih dalam tahap pengembangan. Perubahan fitur terbaru berada pada branch `feature/cash-management-foundation` melalui [PR #2](https://github.com/PanciWartegX/PanciLedger/pull/2). PR tetap Draft sampai seluruh integrasi Supabase dan QA selesai.
 
-Antarmuka pengguna menggunakan Bahasa Indonesia. Domain produksi yang dituju adalah **https://panciledger.vercel.app**.
+### Fitur yang sudah tersedia di branch pengembangan
 
-Aplikasi masih dalam pengembangan. Fitur dana bersama, pembalikan transfer berpasangan, anggaran, target tabungan, transaksi berulang, laporan/ekspor, notifikasi, administrasi akun dan anggota, serta pengujian integrasi yang lebih luas belum selesai. Jangan anggap aplikasi siap produksi sebelum migrasi database dan alur Supabase diuji langsung.
+- Autentikasi email/kata sandi Supabase dan sesi sisi server.
+- Multi-workspace dan enam role: OWNER, ADMIN, TREASURER, AUDITOR, MEMBER, VIEWER.
+- Akun keuangan, saldo berbasis ledger, pemasukan, pengeluaran, transfer atomik, dan pembalikan transaksi tunggal.
+- Audit aktivitas workspace dan rekonsiliasi kas.
+- Anggaran berdasarkan periode, mata uang, dan akun.
+- Dana bersama: komitmen, pencatatan iuran, pengeluaran yang dibatasi saldo, serta progres anggota.
+- Target tabungan dengan setoran/penarikan sebagai transfer ledger.
+- Template transaksi berulang dengan eksekusi manual dan log idempoten.
+- Notifikasi transaksi dengan status baca per pengguna.
+- Undangan workspace berbasis email terverifikasi, token kedaluwarsa, penerimaan dan perpanjangan undangan.
+- Grafik arus kas 12 bulan dan ekspor transaksi POSTED ke CSV.
+
+### Batasan yang masih diketahui
+
+- Migrasi fitur baru belum diterapkan ke project Supabase hosted yang terhubung. CI menguji seluruh migrasi pada PostgreSQL 17 sementara; pengujian CI bukan pengganti uji integrasi pada project Supabase terpisah.
+- Karena migrasi fitur baru belum diterapkan ke database hosted, modul anggaran, dana bersama, tabungan, transaksi berulang, notifikasi, dan undangan belum dapat dianggap aktif pada deployment yang memakai database tersebut.
+- Eksekusi transaksi berulang masih manual. Scheduler/cron otomatis belum dikonfigurasi.
+- Undangan menghasilkan tautan untuk dibagikan; pengiriman email otomatis belum diintegrasikan.
+- Ekspor yang tersedia saat ini adalah CSV. Ekspor PDF/XLSX, lampiran file, avatar/profil lengkap, dan pengaturan workspace lanjutan masih perlu dikembangkan.
+- Belum ada klaim siap produksi. Perlu uji end-to-end, verifikasi konfigurasi Supabase, backup, dan QA pengguna sebelum rilis.
 
 ## Teknologi
 
-- Next.js App Router dan TypeScript
-- Supabase Auth, PostgreSQL, Row Level Security, dan SQL RPC
-- Tailwind CSS
-- Recharts dan Lucide
+- Next.js App Router, React, TypeScript
+- Supabase Auth, PostgreSQL, Row Level Security, SQL RPC
+- Tailwind CSS, Recharts, Lucide
+- GitHub Actions dan Vercel Preview
 
 ## Menjalankan secara lokal
 
-1. Gunakan Node.js versi 20.9 atau lebih baru.
-2. Pasang dependensi dengan `npm install`.
+1. Gunakan Node.js 20.9 atau lebih baru.
+2. Pasang dependensi: `npm install`.
 3. Salin `.env.example` menjadi `.env.local`.
-4. Isi `NEXT_PUBLIC_SUPABASE_URL` dan `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` di `.env.local`.
-5. Tinjau dan terapkan seluruh migrasi SQL di `supabase/migrations` secara berurutan pada project Supabase yang benar.
-6. Atur Site URL dan Redirect URLs Supabase Auth untuk pengembangan lokal.
-7. Jalankan `npm run dev`.
+4. Isi `NEXT_PUBLIC_SUPABASE_URL` dan `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+5. Jalankan `npm run dev`.
 
-Publishable key memang dirancang untuk digunakan di browser dan tidak memberikan akses database tingkat tinggi. Row Level Security dan pemeriksaan otorisasi di server tetap wajib. Aplikasi saat ini tidak membutuhkan secret/service-role key Supabase. Jangan pernah memasukkan secret key ke variabel `NEXT_PUBLIC_*` atau menyimpannya di Git.
+Jangan mengarahkan aplikasi pengembangan ke database Production. Siapkan project Supabase Free terpisah untuk development/Preview bila ingin menguji fitur baru secara langsung. Tinjau backup, urutan, dan isi semua file di `supabase/migrations` sebelum menerapkannya ke project hosted. Jangan menjalankan migrasi fitur baru pada database yang berisi data pengguna tanpa persetujuan eksplisit dan rencana pemulihan.
 
-## Pengaturan Vercel
+## Variabel lingkungan
 
-1. Hubungkan repository privat `PanciWartegX/PanciLedger` ke Vercel.
-2. Pastikan nama project Vercel adalah `panciledger` agar domain bawaan yang dituju menjadi `panciledger.vercel.app`.
-3. Gunakan branch `main` sebagai Production Branch. Branch `develop` dapat digunakan untuk Preview.
-4. Pastikan `NEXT_PUBLIC_SUPABASE_URL` dan `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` tersedia pada environment yang digunakan.
-5. Di Vercel, buka **Project Settings → Domains** dan pastikan `panciledger.vercel.app` ditambahkan serta berstatus valid. Nama domain belum dianggap aktif hanya karena sudah ditulis di konfigurasi aplikasi.
-6. Tambahkan `https://panciledger.vercel.app/auth/callback` ke Supabase Authentication → URL Configuration → Redirect URLs. Atur Site URL ke `https://panciledger.vercel.app` setelah deployment domain tervalidasi.
-7. Uji pendaftaran, konfirmasi email, login, isolasi antar-ruang kerja, peran anggota, saldo akun, transaksi, transfer, pembalikan transaksi, pembuatan ruang kerja, dan logout.
-8. Pertahankan deployment Preview sampai semua pengujian berhasil dan deployment Production disetujui.
+Variabel yang digunakan aplikasi:
 
-Vercel mendeteksi Next.js secara otomatis. Perintah build yang digunakan adalah `npm run build`.
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 
-## Prinsip data dan keamanan
+Publishable key memang dirancang untuk dipakai di browser. Aplikasi tidak membutuhkan service-role/secret key di browser. Jangan menaruh secret key di variabel `NEXT_PUBLIC_*` atau menyimpannya di Git.
 
-- Satu akun pengguna dapat mengelola beberapa ruang kerja.
-- Keanggotaan dan peran ruang kerja ditegakkan oleh PostgreSQL RLS dan pemeriksaan sisi server.
-- Nilai uang disimpan menggunakan PostgreSQL `numeric`, bukan floating point.
-- Transaksi yang sudah dibukukan tidak dapat diubah; koreksi dilakukan melalui catatan pembalikan.
-- Transfer terdiri dari dua sisi dan disimpan secara atomik.
-- Deployment Preview dipertahankan sampai Production disetujui secara eksplisit.
+## Vercel
 
-## Validasi
+- Repository: `PanciWartegX/PanciLedger`
+- Project Vercel: `panciledger`
+- Production Branch yang dituju: `main`
+- Branch pengembangan: `feature/cash-management-foundation`
+- Domain target: `panciledger.vercel.app`
 
-CI menjalankan pemasangan dependensi, pemeriksaan tipe TypeScript, ESLint, dan build Next.js untuk push serta pull request ke branch `main` dan `develop`.
+Deployment Preview digunakan untuk QA. Pastikan environment Preview menunjuk ke project Supabase development, bukan database Production. Production deployment dan migrasi database Production memerlukan persetujuan eksplisit setelah QA.
 
-## Fitur yang direncanakan
+## Database dan keamanan
 
-Dana bersama/iuran, target tabungan, anggaran, transaksi berulang, laporan dan ekspor, notifikasi, lampiran aman, administrasi akun/anggota, serta cakupan pengujian yang lebih luas.
+- Nilai uang disimpan dengan PostgreSQL `numeric`, bukan floating point.
+- Perubahan saldo berasal dari ledger; jangan mengubah saldo akun secara langsung.
+- Transaksi POSTED tidak dapat diedit atau dihapus secara langsung; koreksi dilakukan melalui alur pembalikan yang tervalidasi.
+- Transfer menggunakan dua sisi transaksi yang dibuat secara atomik.
+- RPC memeriksa role di server/database; RLS menjadi batas isolasi workspace.
+- Tabel dan fungsi sensitif menggunakan grant minimum.
+- Storage dan lampiran privat belum diimplementasikan.
+
+## CI dan QA
+
+GitHub Actions menjalankan:
+
+1. Instalasi dependensi.
+2. TypeScript check.
+3. ESLint.
+4. Build Next.js.
+5. Bootstrap PostgreSQL 17 sementara dan lapisan Auth minimal.
+6. Menjalankan semua migrasi dari database kosong.
+7. Memverifikasi tabel, RPC inti, dan RLS.
+8. Menguji isolasi workspace, hak role, idempotensi transaksi/anggaran, dana bersama, tabungan, notifikasi, dan undangan.
+
+CI yang lulus membuktikan rangkaian migrasi dan pemeriksaan tersebut pada database uji sementara. CI tidak membuktikan konfigurasi environment hosted, email delivery, scheduler, atau seluruh alur UI sudah siap produksi.
