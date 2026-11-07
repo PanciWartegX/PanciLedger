@@ -25,6 +25,8 @@ export default function LoginPage() {
       setMessage("Logout belum berhasil. Silakan coba lagi.");
     } else if (params.get("error") === "auth_callback") {
       setMessage("Tautan verifikasi atau pemulihan tidak valid atau sudah kedaluwarsa. Minta tautan baru.");
+    } else if (params.get("password_updated") === "1") {
+      setMessage("Kata sandi berhasil diperbarui. Silakan masuk kembali.");
     } else if (params.get("logged_out") === "1") {
       setMessage("Kamu berhasil keluar dari PanciLedger.");
     }
