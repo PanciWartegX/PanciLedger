@@ -17,7 +17,50 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
+          cache: npm
+      - run: npm ci
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build
+
+  database-migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: panciledger_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d panciledger_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGDATABASE: panciledger_test
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      - name: Bootstrap minimal Supabase auth schema
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/bootstrap.sql
+      - name: Apply every migration to a clean PostgreSQL database
+        shell: bash
+        run: |
+          set -euo pipefail
+          for migration in supabase/migrations/*.sql; do
+            echo "::group::Applying ${migration}"
+            psql -v ON_ERROR_STOP=1 -f "${migration}"
+            echo "::endgroup::"
+          done
+      - name: Verify schema, RPCs and row-level security
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_schema.sql
