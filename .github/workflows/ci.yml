@@ -63,3 +63,5 @@ jobs:
           done
       - name: Verify schema, RPCs and row-level security
         run: psql -v ON_ERROR_STOP=1 -f supabase/tests/assert_schema.sql
+      - name: Test workspace isolation, roles and financial workflows
+        run: psql -v ON_ERROR_STOP=1 -f supabase/tests/authorization_and_ledger.sql
