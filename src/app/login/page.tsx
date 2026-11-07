@@ -45,7 +45,9 @@ export default function LoginPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const next = params.get("next");
-    if (next && next.startsWith("/") && !next.startsWith("//")) setNextPath(next);
+    // Mirror the server-side check in auth-actions.ts: browsers normalise "\" to "/",
+    // so "/\evil.example" would otherwise behave like a protocol-relative URL.
+    if (next && next.startsWith("/") && !next.startsWith("//") && !next.includes("\\")) setNextPath(next);
     if (params.get("error") === "invalid_credentials") {
       setMessage("Username/email atau kata sandi tidak sesuai.");
     } else if (params.get("error") === "logout_failed") {
