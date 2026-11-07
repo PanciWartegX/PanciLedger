@@ -205,7 +205,7 @@ where workspace_id='10000000-0000-0000-0000-000000000001'
   and invited_email='invitee@panciledger.test' and accepted_at is null;
 set role authenticated;
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);
-do $
+do $renew$
 declare renewed_token uuid;
 begin
   renewed_token := public.create_workspace_invitation(
@@ -217,12 +217,13 @@ begin
     raise exception 'Expired invitation renewal failed';
   end if;
 end;
-$;
+$renew$;
 
 -- The invited address must match the verified account before membership is added.
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000005',false);
 select set_config('request.jwt.claims','{"email":"invitee@panciledger.test","sub":"00000000-0000-0000-0000-000000000005"}',false);
-do $
+
+do $invite$
 declare token uuid;
 begin
   select invite_token into token from public.workspace_invitations
