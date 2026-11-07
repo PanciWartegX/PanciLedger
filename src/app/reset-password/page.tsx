@@ -37,7 +37,11 @@ export default function ResetPasswordPage() {
         setMessage("Kata sandi belum dapat diperbarui. Pastikan memenuhi kebijakan keamanan.");
         return;
       }
-      await supabase.auth.signOut({ scope: "local" });
+      const { error: signOutError } = await supabase.auth.signOut({ scope: "local" });
+      if (signOutError) {
+        setMessage("Kata sandi sudah diperbarui, tetapi sesi belum keluar. Keluar secara manual lalu masuk kembali.");
+        return;
+      }
       router.replace("/login?password_updated=1");
     } catch {
       setMessage("Terjadi kesalahan. Silakan coba lagi.");
