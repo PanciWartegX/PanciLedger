@@ -13,15 +13,16 @@ const safeNext = (value: FormDataEntryValue | null) => {
 export async function signInWithUsernameAction(data: FormData) {
   const identifier = String(data.get("identifier") ?? "").trim();
   const password = String(data.get("password") ?? "");
+  const captchaToken = String(data.get("captchaToken") ?? "");
   const next = safeNext(data.get("next"));
 
-  if (identifier.length < 3 || identifier.length > 254 || password.length < 8 || password.length > 256) {
+  if (identifier.length < 3 || identifier.length > 254 || password.length < 8 || password.length > 256 || (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !captchaToken)) {
     redirect("/login?error=invalid_credentials");
   }
 
   const supabase = await createClient();
   const { data: sessionData, error: loginError } = await supabase.functions.invoke("username-login", {
-    body: { identifier, password },
+    body: { identifier, password, captchaToken: captchaToken || undefined },
   });
 
   if (loginError || !sessionData?.access_token || !sessionData?.refresh_token) {
