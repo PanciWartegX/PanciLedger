@@ -97,7 +97,7 @@ export async function FinanceApp({ searchParams, forcedView }: Props) {
     { key: "reports", label: "Laporan & audit", roles: ["OWNER","ADMIN","AUDITOR"] },
     { key: "profile", label: "Profil akun", roles: ["OWNER","ADMIN","TREASURER","AUDITOR","MEMBER","VIEWER"] },
   ].filter(item => item.roles.includes(role));
-  const requestedView = params.view ?? forcedView ?? "dashboard";
+  const requestedView = forcedView ?? params.view ?? "dashboard";
   const view = menuItems.some(item => item.key === requestedView) ? requestedView : "dashboard";
   const viewTitle = menuItems.find(item => item.key === view)?.label ?? "Dashboard";
   const [{ data: accounts }, { data: transactions }, { data: audit }, { data: reconciliationRows }, { data: budgetRows }, { data: budgetUsageRows }, { data: pooledFundRows }, { data: pooledBalanceRows }, { data: pooledProgressRows }, { data: pooledContributionRows }, { data: pooledExpenseRows }, { data: savingsGoalRows }, { data: savingsProgressRows }, { data: savingsMovementRows }, { data: recurringRows }, { data: recurringLogRows }, { data: notificationRows }, { data: trendRows }] = await Promise.all([
