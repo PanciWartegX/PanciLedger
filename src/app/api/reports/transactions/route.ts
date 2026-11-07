@@ -20,7 +20,21 @@ export async function GET(request: Request) {
   }
 
   const { data: membership } = await db.from("workspace_members").select("role").eq("workspace_id", workspace).eq("user_id", auth.user.id).maybeSingle();
-  if (!membership) return new Response("Workspace not found", { status: 404 });
+  if (!membership) {
+    return new Response("Workspace not found", {
+      status: 404,
+      headers: { "Cache-Control": "private, no-store, max-age=0" },
+    });
+  }
+
+  // The report export is intentionally restricted to workspace owners,
+  // administrators, and auditors. Hiding the menu is not authorization.
+  if (!["OWNER", "ADMIN", "AUDITOR"].includes(membership.role)) {
+    return new Response("Forbidden", {
+      status: 403,
+      headers: { "Cache-Control": "private, no-store, max-age=0" },
+    });
+  }
 
   let query = db.from("financial_transactions")
     .select("occurred_at,kind,direction,amount,currency,description,status,account_id")
