@@ -18,7 +18,7 @@ export default function LoginPage() {
   const [message, setMessage] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaWidgetKey, setCaptchaWidgetKey] = useState(0);
-  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
+  const turnstileSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "0x4AAAAAAF3P0_n6rARa9awP";
   const captchaReady = Boolean(turnstileSiteKey && captchaToken);
 
   function resetCaptcha() {
