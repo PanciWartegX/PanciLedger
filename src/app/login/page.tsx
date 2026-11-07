@@ -37,7 +37,7 @@ export default function LoginPage() {
     setBusy(true);
     setMessage("");
     try {
-      if (!email.trim() || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email.trim())) {
+      if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
         throw new Error("Masukkan alamat email yang valid.");
       }
       const supabase = createClient();
@@ -107,8 +107,8 @@ export default function LoginPage() {
       </div>
       <div className="panel p-7 sm:p-8">
         <div className="text-center">
-          <h1 className="text-2xl font-semibold">{mode === "signin" ? "Selamat datang kembali" : "Buat akun PanciLedger"}</h1>
-          <p className="muted mt-2 text-sm">{mode === "signin" ? "Masuk menggunakan username atau email dan kata sandi." : "Buat akun pribadi, lalu bergabung ke ruang kerja melalui undangan."}</p>
+          <h1 className="text-2xl font-semibold">{mode === "signin" ? "Selamat datang kembali" : mode === "signup" ? "Buat akun PanciLedger" : "Pulihkan kata sandi"}</h1>
+          <p className="muted mt-2 text-sm">{mode === "signin" ? "Masuk menggunakan username atau email dan kata sandi." : mode === "signup" ? "Buat akun pribadi, lalu bergabung ke ruang kerja melalui undangan." : "Masukkan email akun untuk menerima tautan pemulihan."}</p>
         </div>
         {mode === "signin" ? <form action={signInWithUsernameAction} className="mt-7 space-y-4">
           <label className="block text-sm text-slate-300">Username atau email
