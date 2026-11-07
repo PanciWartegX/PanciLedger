@@ -11,10 +11,10 @@ PanciLedger aktif dikembangkan pada branch `main`. Fitur keuangan inti dan modul
 ### Akun pengguna dan akses workspace
 
 - Pengguna mendaftar sendiri dari halaman website dengan nama tampilan, username unik, email, dan kata sandi.
-- Email tetap digunakan sebagai identitas Auth dan pemulihan akun; verifikasi email dapat dimatikan di pengaturan Auth. Setelah akun terverifikasi, pengguna dapat masuk menggunakan username atau email beserta kata sandi.
+- Email tetap digunakan sebagai identitas Auth dan pemulihan akun. Jika Confirm Email dimatikan di Supabase Auth, akun langsung aktif dan pengguna dapat masuk menggunakan username atau email beserta kata sandi.
 - Kredensial dikelola Supabase Auth. PanciLedger tidak menyimpan kata sandi sendiri.
 - Username dipetakan ke akun Auth melalui Edge Function `username-login`; service-role key hanya digunakan di sisi Edge Function dan tidak dikirim ke browser.
-- Undangan workspace dikirim sebagai tautan yang terikat pada email. Penerima membuat akun sendiri, memlalu menerima undangan.
+- Undangan workspace dikirim sebagai tautan yang terikat pada email. Penerima membuat akun sendiri, lalu menerima undangan.
 - Profil menyimpan nama tampilan dan username. RLS membatasi profil yang dapat dilihat ke pengguna sendiri dan rekan satu workspace.
 - Menu antarmuka mengikuti role OWNER, ADMIN, TREASURER, AUDITOR, MEMBER, dan VIEWER. Hak tulis tetap divalidasi di database/RPC, bukan hanya dengan menyembunyikan tombol.
 
