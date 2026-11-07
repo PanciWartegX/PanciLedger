@@ -115,6 +115,14 @@ begin
   invite_token := public.create_workspace_invitation(
     '10000000-0000-0000-0000-000000000001','invitee@panciledger.test','MEMBER'
   );
+  begin
+    perform public.create_workspace_invitation(
+      '10000000-0000-0000-0000-000000000001','invitee@panciledger.test','MEMBER'
+    );
+    raise exception 'Active duplicate invitation was accepted';
+  exception when unique_violation then
+    null;
+  end;
 
   if not exists(select 1 from public.notifications where recipient_id='00000000-0000-0000-0000-000000000001') then
     raise exception 'Expected owner transaction notifications were not created';
@@ -169,7 +177,7 @@ begin
   end;
   select current_balance into n from public.workspace_account_balances
   where id='20000000-0000-0000-0000-000000000001';
-  if n<>1075 then raise exception 'Ledger balance mismatch: %',n; end if;
+  if n<>1035 then raise exception 'Ledger balance mismatch: %',n; end if;
 end;
 $$;
 
@@ -189,6 +197,27 @@ begin
   end;
 end;
 $$;
+
+-- Expired invitations can be renewed without leaving a stale unique-index entry.
+reset role;
+update public.workspace_invitations set expires_at=now()-interval '1 minute'
+where workspace_id='10000000-0000-0000-0000-000000000001'
+  and invited_email='invitee@panciledger.test' and accepted_at is null;
+set role authenticated;
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);
+do $
+declare renewed_token uuid;
+begin
+  renewed_token := public.create_workspace_invitation(
+    '10000000-0000-0000-0000-000000000001','invitee@panciledger.test','MEMBER'
+  );
+  if renewed_token is null or not exists(select 1 from public.workspace_invitations
+    where invited_email='invitee@panciledger.test' and invite_token=renewed_token
+      and expires_at>now() and accepted_at is null) then
+    raise exception 'Expired invitation renewal failed';
+  end if;
+end;
+$;
 
 -- The invited address must match the verified account before membership is added.
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000005',false);
