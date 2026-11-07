@@ -15,6 +15,7 @@ Deno.serve(async (request: Request) => {
     const body = await request.json();
     const identifier = typeof body.identifier === "string" ? body.identifier.trim() : "";
     const password = typeof body.password === "string" ? body.password : "";
+    const captchaToken = typeof body.captchaToken === "string" ? body.captchaToken : "";
     if (identifier.length < 3 || identifier.length > 254 || password.length < 8 || password.length > 256) {
       return invalidCredentials();
     }
@@ -51,7 +52,11 @@ Deno.serve(async (request: Request) => {
       email = userData.user.email;
     }
 
-    const { data, error } = await authClient.auth.signInWithPassword({ email, password });
+    const { data, error } = await authClient.auth.signInWithPassword({
+      email,
+      password,
+      ...(captchaToken ? { options: { captchaToken } } : {}),
+    });
     if (error || !data.session) return invalidCredentials();
 
     return new Response(JSON.stringify({
