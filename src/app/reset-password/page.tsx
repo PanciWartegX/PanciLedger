@@ -64,9 +64,10 @@ export default function ResetPasswordPage() {
             <label className="block text-sm text-slate-300">Kata sandi baru
               <input required minLength={8} maxLength={256} type="password" autoComplete="new-password" value={password} onChange={event=>setPassword(event.target.value)} className="field mt-2" />
             </label>
-            <label className="block text-sm text-slate-300">Ulangi kata sandi
-              <input required minLength={8} maxLength={256} type="password" autoComplete="new-password" value={confirm} onChange={event=>setConfirm(event.target.value)} className="field mt-2" />
+            <label className="block text-sm text-slate-300">Konfirmasi kata sandi baru
+              <input required minLength={8} maxLength={256} type="password" autoComplete="new-password" value={confirm} onChange={event=>setConfirm(event.target.value)} aria-invalid={Boolean(confirm && password !== confirm)} className="field mt-2" />
             </label>
+            {confirm && password !== confirm && <p role="alert" className="text-xs text-rose-300">Konfirmasi kata sandi belum sama.</p>}
             {message && <p role="alert" className="rounded-xl border border-rose-400/20 bg-rose-400/5 p-3 text-sm text-rose-200">{message}</p>}
             <button type="submit" disabled={busy} className="primary flex w-full items-center justify-center gap-2 disabled:opacity-60">{busy && <LoaderCircle className="animate-spin" size={17}/>} Simpan kata sandi baru</button>
           </form>
