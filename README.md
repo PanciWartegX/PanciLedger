@@ -11,10 +11,10 @@ PanciLedger aktif dikembangkan pada branch `main`. Fitur keuangan inti dan modul
 ### Akun pengguna dan akses workspace
 
 - Pengguna mendaftar sendiri dari halaman website dengan nama tampilan, username unik, email, dan kata sandi.
-- Email digunakan untuk verifikasi serta pemulihan akun. Setelah akun terverifikasi, pengguna dapat masuk menggunakan username atau email beserta kata sandi.
+- Email tetap digunakan sebagai identitas Auth dan pemulihan akun; verifikasi email dapat dimatikan di pengaturan Auth. Setelah akun terverifikasi, pengguna dapat masuk menggunakan username atau email beserta kata sandi.
 - Kredensial dikelola Supabase Auth. PanciLedger tidak menyimpan kata sandi sendiri.
 - Username dipetakan ke akun Auth melalui Edge Function `username-login`; service-role key hanya digunakan di sisi Edge Function dan tidak dikirim ke browser.
-- Undangan workspace dikirim sebagai tautan yang terikat pada email. Penerima membuat akun sendiri, memverifikasi email, lalu menerima undangan.
+- Undangan workspace dikirim sebagai tautan yang terikat pada email. Penerima membuat akun sendiri, memlalu menerima undangan.
 - Profil menyimpan nama tampilan dan username. RLS membatasi profil yang dapat dilihat ke pengguna sendiri dan rekan satu workspace.
 - Menu antarmuka mengikuti role OWNER, ADMIN, TREASURER, AUDITOR, MEMBER, dan VIEWER. Hak tulis tetap divalidasi di database/RPC, bukan hanya dengan menyembunyikan tombol.
 
@@ -73,7 +73,7 @@ Database utama sudah berisi data workspace dan transaksi. Jangan menghapus, mere
 2. Pasang dependensi: `npm install`.
 3. Salin `.env.example` menjadi `.env.local`.
 4. Isi `NEXT_PUBLIC_SUPABASE_URL` dan `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
-5. Jalankan `npm run dev`.
+5. Untuk CAPTCHA, isi `NEXT_PUBLIC_TURNSTILE_SITE_KEY` dengan Site Key Cloudflare. Masukkan Secret Key Cloudflare di Supabase Dashboard, lalu aktifkan CAPTCHA untuk Auth.\n6. Jalankan `npm run dev`.
 
 ## Variabel lingkungan
 
