@@ -315,6 +315,29 @@ export async function createPooledFundExpenseAction(data: FormData) {
   redirect("/?workspace=" + workspace + "&view=pooled");
 }
 
+export async function updateOwnProfileAction(data: FormData) {
+  const username = field(data, "username").toLowerCase();
+  const displayName = field(data, "display_name");
+  if (!/^[a-z0-9_]{3,24}$/.test(username) || displayName.length < 1 || displayName.length > 80) {
+    redirect("/?view=profile&error=invalid_profile");
+  }
+
+  const db = await createClient();
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { error } = await db.from("profiles")
+    .update({ username, display_name: displayName })
+    .eq("id", user.id);
+
+  if (error) {
+    redirect("/?view=profile&error=" + (error.code === "23505" ? "username_taken" : "profile_update_failed"));
+  }
+
+  revalidatePath("/");
+  redirect("/?view=profile&profile_updated=1");
+}
+
 export async function signOutAction() {
   const db = await createClient();
   const { error } = await db.auth.signOut({ scope: "local" });
