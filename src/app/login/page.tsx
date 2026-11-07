@@ -1,21 +1,32 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState, type FormEvent } from "react";
 import { CircleDollarSign, LoaderCircle, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { signInWithUsernameAction } from "@/app/auth-actions";
 
 export default function LoginPage() {
-  const searchParams = useSearchParams();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
-  const [identifier, setIdentifier] = useState("");
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [nextPath, setNextPath] = useState("/");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get("next");
+    if (next && next.startsWith("/") && !next.startsWith("//")) setNextPath(next);
+    if (params.get("error") === "invalid_credentials") {
+      setMessage("Username/email atau kata sandi tidak sesuai. Pastikan email sudah diverifikasi.");
+    } else if (params.get("error") === "logout_failed") {
+      setMessage("Logout belum berhasil. Silakan coba lagi.");
+    } else if (params.get("logged_out") === "1") {
+      setMessage("Kamu berhasil keluar dari PanciLedger.");
+    }
+  }, []);
 
   async function signup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -30,10 +41,8 @@ export default function LoginPage() {
         throw new Error("Nama lengkap harus 2–80 karakter.");
       }
       const supabase = createClient();
-      const next = searchParams.get("next");
-      const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "/";
       const callback = new URL("/auth/callback", window.location.origin);
-      callback.searchParams.set("next", safeNext);
+      callback.searchParams.set("next", nextPath);
       const { data, error } = await supabase.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
@@ -52,7 +61,7 @@ export default function LoginPage() {
         throw new Error("Pendaftaran gagal. Periksa email dan kata sandi, lalu coba lagi.");
       }
       if (data.session) {
-        window.location.assign(safeNext);
+        window.location.assign(nextPath);
         return;
       }
       setMessage("Akun berhasil dibuat. Periksa email untuk verifikasi sebelum masuk.");
@@ -62,13 +71,6 @@ export default function LoginPage() {
       setBusy(false);
     }
   }
-
-  const authError = searchParams.get("error");
-  const initialMessage = authError === "invalid_credentials"
-    ? "Username/email atau kata sandi tidak sesuai. Pastikan email sudah diverifikasi."
-    : authError === "logout_failed"
-      ? "Logout belum berhasil. Silakan coba lagi."
-      : "";
 
   return <main className="grid min-h-screen place-items-center px-5 py-10">
     <section className="w-full max-w-md">
@@ -81,33 +83,34 @@ export default function LoginPage() {
           <h1 className="text-2xl font-semibold">{mode === "signin" ? "Selamat datang kembali" : "Buat akun PanciLedger"}</h1>
           <p className="muted mt-2 text-sm">{mode === "signin" ? "Masuk menggunakan username atau email dan kata sandi." : "Buat akun pribadi, lalu bergabung ke ruang kerja melalui undangan."}</p>
         </div>
-        <form onSubmit={mode === "signin" ? (event) => { event.preventDefault(); (document.getElementById("username-login-submit") as HTMLButtonElement | null)?.click(); } : signup} className="mt-7 space-y-4">
-          {mode === "signin" ? <>
-            <label className="block text-sm text-slate-300">Username atau email
-              <input required autoComplete="username" value={identifier} onChange={e=>setIdentifier(e.target.value)} className="field mt-2" placeholder="username atau email"/>
-            </label>
-          </> : <>
-            <label className="block text-sm text-slate-300">Nama lengkap
-              <input required minLength={2} maxLength={80} autoComplete="name" value={displayName} onChange={e=>setDisplayName(e.target.value)} className="field mt-2" placeholder="Nama yang akan ditampilkan"/>
-            </label>
-            <label className="block text-sm text-slate-300">Username
-              <input required minLength={3} maxLength={24} autoComplete="username" value={username} onChange={e=>setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,""))} className="field mt-2" placeholder="contoh: renanda_01"/>
-              <span className="muted mt-1 block text-xs">3–24 karakter: huruf kecil, angka, garis bawah.</span>
-            </label>
-            <label className="block text-sm text-slate-300">Email untuk verifikasi dan pemulihan akun
-              <input required type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} className="field mt-2" placeholder="you@example.com"/>
-            </label>
-          </>}
-          <label className="block text-sm text-slate-300">Kata sandi
-            <input required minLength={8} maxLength={256} type="password" autoComplete={mode === "signin" ? "current-password" : "new-password"} value={password} onChange={e=>setPassword(e.target.value)} className="field mt-2" placeholder="Minimal 8 karakter"/>
+        {mode === "signin" ? <form action={signInWithUsernameAction} className="mt-7 space-y-4">
+          <label className="block text-sm text-slate-300">Username atau email
+            <input required name="identifier" autoComplete="username" className="field mt-2" placeholder="username atau email"/>
           </label>
-          {(message || initialMessage) && <p role="status" className="rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-3 text-sm text-emerald-200">{message || initialMessage}</p>}
-          {mode === "signin"
-            ? <button id="username-login-submit" formAction={signInWithUsernameAction} disabled={busy} className="primary w-full">Masuk</button>
-            : <button type="submit" disabled={busy} className="primary flex w-full items-center justify-center gap-2">{busy && <LoaderCircle className="animate-spin" size={17}/>} Daftar akun</button>}
-          {mode === "signin" && <input type="hidden" name="next" value={searchParams.get("next") ?? "/"}/>}
-        </form>
-        <div className="muted mt-5 text-center text-sm">{mode === "signin" ? "Belum punya akun?" : "Sudah punya akun?"} <button onClick={()=>{setMode(mode === "signin" ? "signup" : "signin");setMessage("");}} className="font-medium text-emerald-300">{mode === "signin" ? "Daftar akun" : "Masuk"}</button></div>
+          <label className="block text-sm text-slate-300">Kata sandi
+            <input required name="password" minLength={8} maxLength={256} type="password" autoComplete="current-password" className="field mt-2" placeholder="Kata sandi"/>
+          </label>
+          <input type="hidden" name="next" value={nextPath}/>
+          {message && <p role="status" className="rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-3 text-sm text-emerald-200">{message}</p>}
+          <button type="submit" className="primary w-full">Masuk</button>
+        </form> : <form onSubmit={signup} className="mt-7 space-y-4">
+          <label className="block text-sm text-slate-300">Nama lengkap
+            <input required minLength={2} maxLength={80} autoComplete="name" value={displayName} onChange={e=>setDisplayName(e.target.value)} className="field mt-2" placeholder="Nama yang akan ditampilkan"/>
+          </label>
+          <label className="block text-sm text-slate-300">Username
+            <input required minLength={3} maxLength={24} autoComplete="username" value={username} onChange={e=>setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,""))} className="field mt-2" placeholder="contoh: renanda_01"/>
+            <span className="muted mt-1 block text-xs">3–24 karakter: huruf kecil, angka, garis bawah.</span>
+          </label>
+          <label className="block text-sm text-slate-300">Email untuk verifikasi dan pemulihan akun
+            <input required type="email" autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)} className="field mt-2" placeholder="you@example.com"/>
+          </label>
+          <label className="block text-sm text-slate-300">Kata sandi
+            <input required minLength={8} maxLength={256} type="password" autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)} className="field mt-2" placeholder="Minimal 8 karakter"/>
+          </label>
+          {message && <p role="status" className="rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-3 text-sm text-emerald-200">{message}</p>}
+          <button type="submit" disabled={busy} className="primary flex w-full items-center justify-center gap-2 disabled:opacity-60">{busy && <LoaderCircle className="animate-spin" size={17}/>} Daftar akun</button>
+        </form>}
+        <div className="muted mt-5 text-center text-sm">{mode === "signin" ? "Belum punya akun?" : "Sudah punya akun?"} <button type="button" onClick={()=>{setMode(mode === "signin" ? "signup" : "signin");setMessage("");}} className="font-medium text-emerald-300">{mode === "signin" ? "Daftar akun" : "Masuk"}</button></div>
       </div>
       <p className="muted mt-5 flex items-center justify-center gap-2 text-xs"><ShieldCheck size={14}/> Dilindungi oleh autentikasi Supabase</p>
       <p className="muted mt-8 text-center text-xs">© 2026 PanciWartegX. Hak cipta dilindungi.</p>
