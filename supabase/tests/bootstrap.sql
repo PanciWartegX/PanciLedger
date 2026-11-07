@@ -16,6 +16,9 @@ create table auth.users (
   created_at timestamptz not null default now()
 );
 
+-- Keep the minimal Auth fixture compatible with profile backfill migrations.
+alter table auth.users add column if not exists raw_user_meta_data jsonb not null default '{}'::jsonb;
+
 create or replace function auth.uid()
 returns uuid
 language sql

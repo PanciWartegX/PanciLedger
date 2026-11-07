@@ -24,8 +24,9 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isLogin = pathname === "/login";
   const isAuthCallback = pathname === "/auth/callback";
+  const isAuthLogout = pathname === "/auth/logout";
 
-  if (!isAuthenticated && !isLogin && !isAuthCallback) {
+  if (!isAuthenticated && !isLogin && !isAuthCallback && !isAuthLogout) {
     const target = request.nextUrl.clone();
     target.pathname = "/login";
     target.searchParams.set("next", pathname + request.nextUrl.search);
