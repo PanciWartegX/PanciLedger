@@ -2,17 +2,17 @@
 
 **PanciWartegX** — aplikasi pengelolaan keuangan untuk beberapa ruang kerja.
 
-Antarmuka menggunakan Bahasa Indonesia dengan tema navy gelap dan aksen emerald. Target domain produksi: **https://panciledger.vercel.app**.
+Antarmuka menggunakan Bahasa Indonesia dengan tema navy gelap dan aksen emerald. Domain utama: **https://panciledger.vercel.app**.
 
 ## Status pengembangan
 
-PanciLedger masih dalam tahap pengembangan. Perubahan fitur terbaru berada pada branch `feature/cash-management-foundation` melalui [PR #2](https://github.com/PanciWartegX/PanciLedger/pull/2). PR tetap Draft sampai seluruh integrasi Supabase dan QA selesai.
+PanciLedger aktif dikembangkan pada branch `main`. Fitur keuangan inti dan modul tambahan telah digabung melalui [PR #2](https://github.com/PanciWartegX/PanciLedger/pull/2).
 
-### Fitur yang sudah tersedia di branch pengembangan
+### Fitur yang tersedia
 
 - Autentikasi email/kata sandi Supabase dan sesi sisi server.
 - Multi-workspace dan enam role: OWNER, ADMIN, TREASURER, AUDITOR, MEMBER, VIEWER.
-- Akun keuangan, saldo berbasis ledger, pemasukan, pengeluaran, transfer atomik, dan pembalikan transaksi tunggal.
+- Akun keuangan, saldo berbasis ledger, pemasukan, pengeluaran, transfer atomik, dan pembalikan transaksi tervalidasi.
 - Audit aktivitas workspace dan rekonsiliasi kas.
 - Anggaran berdasarkan periode, mata uang, dan akun.
 - Dana bersama: komitmen, pencatatan iuran, pengeluaran yang dibatasi saldo, serta progres anggota.
@@ -22,21 +22,36 @@ PanciLedger masih dalam tahap pengembangan. Perubahan fitur terbaru berada pada 
 - Undangan workspace berbasis email terverifikasi, token kedaluwarsa, penerimaan dan perpanjangan undangan.
 - Grafik arus kas 12 bulan dan ekspor transaksi POSTED ke CSV.
 
+### Status database
+
+Migrasi untuk anggaran, dana bersama, target tabungan, transaksi berulang, notifikasi, dan undangan telah diterapkan pada project Supabase utama. Setelah migrasi, tabel baru diverifikasi tersedia dan seluruh tabel publik yang relevan melaporkan RLS aktif.
+
+Migrasi yang diterapkan mencakup:
+- `0007_workspace_budgets.sql`
+- `0008_pooled_funds.sql`
+- `0009_savings_goals.sql`
+- `0010_recurring_transactions.sql`
+- `0011_notifications.sql`
+- `0012_workspace_invitations.sql`
+- `20261107053000_workspace_invitation_renewal.sql`
+
+Database utama sudah berisi data workspace dan transaksi. Jangan menghapus, mereset, atau mengganti data tersebut saat pengembangan.
+
 ### Batasan yang masih diketahui
 
-- Migrasi fitur baru belum diterapkan ke project Supabase hosted yang terhubung. CI menguji seluruh migrasi pada PostgreSQL 17 sementara; pengujian CI bukan pengganti uji integrasi pada project Supabase terpisah.
-- Karena migrasi fitur baru belum diterapkan ke database hosted, modul anggaran, dana bersama, tabungan, transaksi berulang, notifikasi, dan undangan belum dapat dianggap aktif pada deployment yang memakai database tersebut.
 - Eksekusi transaksi berulang masih manual. Scheduler/cron otomatis belum dikonfigurasi.
 - Undangan menghasilkan tautan untuk dibagikan; pengiriman email otomatis belum diintegrasikan.
 - Ekspor yang tersedia saat ini adalah CSV. Ekspor PDF/XLSX, lampiran file, avatar/profil lengkap, dan pengaturan workspace lanjutan masih perlu dikembangkan.
-- Belum ada klaim siap produksi. Perlu uji end-to-end, verifikasi konfigurasi Supabase, backup, dan QA pengguna sebelum rilis.
+- Perlu uji end-to-end tambahan pada alur UI, email, akses multi-role, dan skenario kegagalan sebelum menyatakan aplikasi siap produksi.
+- Advisor Supabase masih melaporkan beberapa temuan keamanan/performa yang perlu ditinjau. Jangan menghapus kontrol SECURITY DEFINER tanpa memeriksa fungsi otorisasi yang dipanggilnya.
+- Perlindungan kata sandi bocor di Supabase Auth masih nonaktif pada konfigurasi project.
 
 ## Teknologi
 
 - Next.js App Router, React, TypeScript
 - Supabase Auth, PostgreSQL, Row Level Security, SQL RPC
 - Tailwind CSS, Recharts, Lucide
-- GitHub Actions dan Vercel Preview
+- GitHub Actions dan Vercel
 
 ## Menjalankan secara lokal
 
@@ -45,8 +60,6 @@ PanciLedger masih dalam tahap pengembangan. Perubahan fitur terbaru berada pada 
 3. Salin `.env.example` menjadi `.env.local`.
 4. Isi `NEXT_PUBLIC_SUPABASE_URL` dan `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 5. Jalankan `npm run dev`.
-
-Jangan mengarahkan aplikasi pengembangan ke database Production. Siapkan project Supabase Free terpisah untuk development/Preview bila ingin menguji fitur baru secara langsung. Tinjau backup, urutan, dan isi semua file di `supabase/migrations` sebelum menerapkannya ke project hosted. Jangan menjalankan migrasi fitur baru pada database yang berisi data pengguna tanpa persetujuan eksplisit dan rencana pemulihan.
 
 ## Variabel lingkungan
 
@@ -61,11 +74,10 @@ Publishable key memang dirancang untuk dipakai di browser. Aplikasi tidak membut
 
 - Repository: `PanciWartegX/PanciLedger`
 - Project Vercel: `panciledger`
-- Production Branch yang dituju: `main`
-- Branch pengembangan: `feature/cash-management-foundation`
-- Domain target: `panciledger.vercel.app`
+- Production Branch: `main`
+- Domain: `panciledger.vercel.app`
 
-Deployment Preview digunakan untuk QA. Pastikan environment Preview menunjuk ke project Supabase development, bukan database Production. Production deployment dan migrasi database Production memerlukan persetujuan eksplisit setelah QA.
+Setiap perubahan pada `main` dapat memicu deployment utama. Pastikan status CI dan deployment diperiksa sebelum menganggap perubahan siap digunakan.
 
 ## Database dan keamanan
 
@@ -73,7 +85,7 @@ Deployment Preview digunakan untuk QA. Pastikan environment Preview menunjuk ke 
 - Perubahan saldo berasal dari ledger; jangan mengubah saldo akun secara langsung.
 - Transaksi POSTED tidak dapat diedit atau dihapus secara langsung; koreksi dilakukan melalui alur pembalikan yang tervalidasi.
 - Transfer menggunakan dua sisi transaksi yang dibuat secara atomik.
-- RPC memeriksa role di server/database; RLS menjadi batas isolasi workspace.
+- RPC memeriksa role di database; RLS menjadi batas isolasi workspace.
 - Tabel dan fungsi sensitif menggunakan grant minimum.
 - Storage dan lampiran privat belum diimplementasikan.
 
@@ -90,4 +102,4 @@ GitHub Actions menjalankan:
 7. Memverifikasi tabel, RPC inti, dan RLS.
 8. Menguji isolasi workspace, hak role, idempotensi transaksi/anggaran, dana bersama, tabungan, notifikasi, dan undangan.
 
-CI yang lulus membuktikan rangkaian migrasi dan pemeriksaan tersebut pada database uji sementara. CI tidak membuktikan konfigurasi environment hosted, email delivery, scheduler, atau seluruh alur UI sudah siap produksi.
+CI yang lulus membuktikan rangkaian migrasi dan pemeriksaan tersebut pada database uji sementara. CI tidak membuktikan seluruh alur UI, konfigurasi email, scheduler, atau semua skenario operasional sudah siap produksi.
