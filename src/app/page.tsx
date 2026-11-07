@@ -2,9 +2,9 @@ import { ArrowDownLeft, ArrowLeftRight, ArrowUpRight, CircleDollarSign, LogOut, 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { FinanceCharts } from "@/components/finance-charts";
-import { createAccountAction, createAndPostTransactionAction, createBudgetAction, createCashReconciliationAction, createWorkspaceInvitationAction, acceptWorkspaceInvitationAction, removeWorkspaceMemberAction, changeWorkspaceMemberRoleAction, markNotificationReadAction, createRecurringTransactionAction, executeDueRecurringAction, createSavingsGoalAction, moveSavingsFundsAction, createPooledFundAction, createPooledFundCommitmentAction, createPooledFundContributionAction, createPooledFundExpenseAction, createTransferAction, createWorkspaceAction, reverseTransactionAction } from "@/app/actions";
+import { createAccountAction, createAndPostTransactionAction, createBudgetAction, createCashReconciliationAction, createWorkspaceInvitationAction, acceptWorkspaceInvitationAction, removeWorkspaceMemberAction, changeWorkspaceMemberRoleAction, markNotificationReadAction, createRecurringTransactionAction, executeDueRecurringAction, createSavingsGoalAction, moveSavingsFundsAction, createPooledFundAction, createPooledFundCommitmentAction, createPooledFundContributionAction, createPooledFundExpenseAction, createTransferAction, createWorkspaceAction, reverseTransactionAction, updateOwnProfileAction } from "@/app/actions";
 
-type Props = { searchParams: Promise<{ workspace?: string; error?: string; invite?: string; accept_invite?: string; view?: string }> };
+type Props = { searchParams: Promise<{ workspace?: string; error?: string; invite?: string; accept_invite?: string; view?: string; profile_updated?: string }> };
 const money = (n: number, currency = "IDR") => new Intl.NumberFormat("id-ID", { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
 const date = (s: string) => new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(new Date(s));
 const roleLabel = (role: string) => (({ OWNER: "Pemilik", ADMIN: "Administrator", TREASURER: "Bendahara", AUDITOR: "Auditor", VIEWER: "Hanya lihat", MEMBER: "Anggota" }) as Record<string, string>)[role] ?? role;
@@ -52,7 +52,10 @@ const errorLabel = (code: string) => (({
   invitation_accept_failed: "Undangan tidak dapat diterima",
   invalid_member: "Data anggota tidak valid",
   member_remove_failed: "Gagal menghapus anggota",
-  member_role_failed: "Gagal mengubah peran anggota"
+  member_role_failed: "Gagal mengubah peran anggota",
+  invalid_profile: "Nama tampilan atau username tidak valid",
+  username_taken: "Username sudah digunakan",
+  profile_update_failed: "Gagal memperbarui profil"
 } as Record<string, string>)[code] ?? "Terjadi kesalahan. Silakan coba lagi.");
 const currencyTotals = (entries: { currency: string; amount: number }[]) => {
   const totals = new Map<string, number>();
@@ -306,7 +309,7 @@ export default async function Home({ searchParams }: Props) {
 
 
       {view === "reports" && ["OWNER","ADMIN","AUDITOR"].includes(role) && (<section className="panel mt-6 p-5"><h3 className="font-semibold">Aktivitas audit</h3><div className="mt-4 space-y-3">{(audit??[]).map(e=><div key={e.id} className="flex justify-between gap-3 text-xs"><span>{actionLabel(e.action)}</span><span className="muted">{date(e.created_at)}</span></div>)}{!audit?.length&&<p className="muted text-sm">Belum ada aktivitas yang tercatat.</p>}</div></section>)}
-      {view === "profile" && <section className="panel mt-6 max-w-2xl p-5"><h3 className="font-semibold">Profil akun</h3><div className="mt-4 grid gap-4 sm:grid-cols-2"><div><div className="muted text-xs">Nama tampilan</div><div className="mt-1 text-sm font-medium">{ownProfile?.display_name ?? "Belum diatur"}</div></div><div><div className="muted text-xs">Username</div><div className="mt-1 text-sm font-medium">@{ownProfile?.username ?? "belum_ada"}</div></div><div><div className="muted text-xs">Email akun</div><div className="mt-1 text-sm">{user.email}</div></div><div><div className="muted text-xs">Akses workspace</div><div className="mt-1 text-sm">{roleLabel(role)}</div></div></div><p className="muted mt-5 text-xs">Kata sandi dikelola oleh Supabase Auth dan tidak disimpan dalam tabel profil PanciLedger.</p></section>}
+      {view === "profile" && <section className="panel mt-6 max-w-2xl p-5"><h3 className="font-semibold">Profil akun</h3><p className="muted mt-1 text-xs">Perbarui nama tampilan dan username untuk masuk ke PanciLedger.</p>{params.profile_updated === "1" && <p role="status" className="mt-4 rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-3 text-sm text-emerald-200">Profil berhasil diperbarui.</p>}<form action={updateOwnProfileAction} className="mt-4 grid gap-3 sm:grid-cols-2"><label className="muted text-xs">Nama tampilan<input name="display_name" required minLength={1} maxLength={80} defaultValue={ownProfile?.display_name ?? ""} className="field mt-1"/></label><label className="muted text-xs">Username<input name="username" required minLength={3} maxLength={24} pattern="[a-z0-9_]{3,24}" defaultValue={ownProfile?.username ?? ""} className="field mt-1"/><span className="muted mt-1 block">3–24 karakter: huruf kecil, angka, garis bawah.</span></label><div className="sm:col-span-2"><button className="secondary">Simpan profil</button></div></form><div className="mt-5 grid gap-4 border-t border-white/[.07] pt-4 sm:grid-cols-2"><div><div className="muted text-xs">Email akun</div><div className="mt-1 text-sm">{user.email}</div></div><div><div className="muted text-xs">Akses workspace</div><div className="mt-1 text-sm">{roleLabel(role)}</div></div></div><p className="muted mt-5 text-xs">Kata sandi dikelola oleh Supabase Auth. Gunakan fitur lupa kata sandi di halaman masuk untuk menggantinya.</p></section>}
       {view === "reports" && <section className="panel mt-6 max-w-2xl p-5"><h3 className="font-semibold">Ekspor laporan transaksi</h3><p className="muted mt-1 text-sm">Unduh transaksi yang sudah dibukukan pada ruang kerja ini dalam format CSV.</p><a className="primary mt-4" href={"/api/reports/transactions?workspace="+active.id}>Unduh laporan CSV</a></section>}
       <footer className="muted mt-8 flex justify-between gap-3 text-xs"><span>© 2026 PanciWartegX. Hak cipta dilindungi.</span><span>Data langsung dari Supabase</span></footer>
     </section>
