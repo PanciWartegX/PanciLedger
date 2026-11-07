@@ -20,7 +20,7 @@ PanciLedger aktif dikembangkan pada branch `main`. Fitur keuangan inti dan modul
 
 ### Navigasi aplikasi
 
-Fitur dipisahkan menjadi menu Dashboard, Akun Keuangan, Transaksi, Keuangan & Anggaran, Perencanaan, Notifikasi, Anggota & Akses, Laporan & Audit, dan Profil. Menu administrasi workspace hanya tersedia untuk OWNER/ADMIN; menu laporan dan audit tersedia untuk OWNER/ADMIN/AUDITOR; menu keuangan tersedia untuk OWNER/ADMIN/TREASURER/AUDITOR. Menu lain menampilkan data sesuai keanggotaan workspace, sedangkan operasi tulis tetap dibatasi oleh role di database.
+Fitur dipisahkan menjadi halaman Dashboard, Akun Keuangan, Transaksi, Rekonsiliasi Kas, Anggaran, Dana Bersama, Target Tabungan, Transaksi Berulang, Notifikasi, Anggota & Akses, Laporan & Audit, dan Profil. Menu administrasi workspace hanya tersedia untuk OWNER/ADMIN; menu laporan dan audit tersedia untuk OWNER/ADMIN/AUDITOR; rekonsiliasi dan anggaran tersedia untuk OWNER/ADMIN/TREASURER/AUDITOR. Menu lain menampilkan data sesuai keanggotaan workspace, sedangkan operasi tulis tetap dibatasi oleh role di database.
 
 ### Fitur yang tersedia
 
