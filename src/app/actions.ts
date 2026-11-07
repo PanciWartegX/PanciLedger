@@ -103,7 +103,7 @@ export async function createCashReconciliationAction(data: FormData) {
   });
   if (error) fail(workspace, "reconciliation_failed");
   revalidatePath("/");
-  redirect(`/?workspace=${workspace}&view=finance`);
+  redirect(`/?workspace=${workspace}&view=reconciliation`);
 }
 
 export async function createBudgetAction(data: FormData) {
@@ -126,7 +126,7 @@ export async function createBudgetAction(data: FormData) {
   });
   if (error) fail(workspace, "budget_create_failed");
   revalidatePath("/");
-  redirect(`/?workspace=${workspace}&view=finance`);
+  redirect(`/?workspace=${workspace}&view=budgets`);
 }
 
 
@@ -194,7 +194,7 @@ export async function createRecurringTransactionAction(data: FormData) {
  const {error}=await db.rpc("create_recurring_transaction",{target_workspace:workspace,template_name:name,transaction_type:kind,target_account:account,template_amount:amount,template_description:description,template_cadence:cadence,custom_interval_days:customDays,first_run_date:firstRun});
  if(error) fail(workspace,"recurring_create_failed");
  revalidatePath("/");
- redirect("/?workspace="+workspace+"&view=planning");
+ redirect("/?workspace="+workspace+"&view=recurring");
 }
 
 export async function executeDueRecurringAction(data: FormData) {
@@ -204,7 +204,7 @@ export async function executeDueRecurringAction(data: FormData) {
  const {error}=await db.rpc("execute_due_recurring",{target_workspace:workspace,max_items:20});
  if(error) fail(workspace,"recurring_execute_failed");
  revalidatePath("/");
- redirect("/?workspace="+workspace+"&view=planning");
+ redirect("/?workspace="+workspace+"&view=recurring");
 }
 
 export async function createSavingsGoalAction(data: FormData) {
@@ -224,7 +224,7 @@ export async function createSavingsGoalAction(data: FormData) {
   });
   if (error) fail(workspace, "savings_goal_create_failed");
   revalidatePath("/");
-  redirect("/?workspace=" + workspace + "&view=planning");
+  redirect("/?workspace=" + workspace + "&view=savings");
 }
 
 export async function moveSavingsFundsAction(data: FormData) {
@@ -241,7 +241,7 @@ export async function moveSavingsFundsAction(data: FormData) {
   });
   if (error) fail(workspace, "savings_movement_failed");
   revalidatePath("/");
-  redirect("/?workspace=" + workspace + "&view=planning");
+  redirect("/?workspace=" + workspace + "&view=savings");
 }
 
 export async function createPooledFundAction(data: FormData) {
@@ -264,7 +264,7 @@ export async function createPooledFundAction(data: FormData) {
   });
   if (error) fail(workspace, "pooled_fund_create_failed");
   revalidatePath("/");
-  redirect("/?workspace=" + workspace + "&view=planning");
+  redirect("/?workspace=" + workspace + "&view=pooled");
 }
 
 export async function createPooledFundCommitmentAction(data: FormData) {
@@ -279,7 +279,7 @@ export async function createPooledFundCommitmentAction(data: FormData) {
   });
   if (error) fail(workspace, "pooled_commitment_failed");
   revalidatePath("/");
-  redirect("/?workspace=" + workspace + "&view=planning");
+  redirect("/?workspace=" + workspace + "&view=pooled");
 }
 
 export async function createPooledFundContributionAction(data: FormData) {
@@ -296,7 +296,7 @@ export async function createPooledFundContributionAction(data: FormData) {
   });
   if (error) fail(workspace, "pooled_contribution_failed");
   revalidatePath("/");
-  redirect("/?workspace=" + workspace + "&view=planning");
+  redirect("/?workspace=" + workspace + "&view=pooled");
 }
 
 export async function createPooledFundExpenseAction(data: FormData) {
@@ -312,7 +312,7 @@ export async function createPooledFundExpenseAction(data: FormData) {
   });
   if (error) fail(workspace, "pooled_expense_failed");
   revalidatePath("/");
-  redirect("/?workspace=" + workspace + "&view=planning");
+  redirect("/?workspace=" + workspace + "&view=pooled");
 }
 
 export async function signOutAction() {
