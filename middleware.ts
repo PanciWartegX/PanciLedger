@@ -13,30 +13,26 @@ export async function middleware(request: NextRequest) {
       setAll(values) {
         values.forEach(({ name, value }) => request.cookies.set(name, value));
         response = NextResponse.next({ request });
-        values.forEach(({ name, value, options }) =>
-          response.cookies.set(name, value, options)
-        );
+        values.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
       },
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  // Refresh/verify the cookie session on every matched request.
+  const { data: { claims } } = await supabase.auth.getClaims();
+  const isAuthenticated = Boolean(claims?.sub);
   const pathname = request.nextUrl.pathname;
   const isLogin = pathname === "/login";
   const isAuthCallback = pathname === "/auth/callback";
 
-  // Email confirmation must reach the callback route before a session exists.
-  if (!user && !isLogin && !isAuthCallback) {
+  if (!isAuthenticated && !isLogin && !isAuthCallback) {
     const target = request.nextUrl.clone();
     target.pathname = "/login";
-    target.searchParams.set("next", pathname);
+    target.searchParams.set("next", pathname + request.nextUrl.search);
     return NextResponse.redirect(target);
   }
 
-  if (user && isLogin) {
+  if (isAuthenticated && isLogin) {
     const target = request.nextUrl.clone();
     target.pathname = "/";
     target.search = "";
