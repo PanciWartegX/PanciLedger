@@ -19,8 +19,8 @@ export async function middleware(request: NextRequest) {
   });
 
   // Refresh/verify the cookie session on every matched request.
-  const { data: { claims } } = await supabase.auth.getClaims();
-  const isAuthenticated = Boolean(claims?.sub);
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const isAuthenticated = Boolean(claimsData?.claims?.sub);
   const pathname = request.nextUrl.pathname;
   const isLogin = pathname === "/login";
   const isAuthCallback = pathname === "/auth/callback";

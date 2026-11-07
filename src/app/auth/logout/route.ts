@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
 
   const { error } = await supabase.auth.signOut({ scope: "local" });
   if (error) {
-    return NextResponse.redirect(new URL("/login?error=logout_failed", request.url), 303);
+    response.headers.set("Location", new URL("/login?error=logout_failed", request.url).toString());
   }
 
   response.headers.set("Cache-Control", "no-store, max-age=0");
