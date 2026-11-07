@@ -32,3 +32,15 @@ $$;
 grant usage on schema auth to anon, authenticated;
 grant execute on function auth.uid() to anon, authenticated;
 grant execute on function auth.jwt() to anon, authenticated;
+
+-- The hosted project has this pre-existing event-trigger callback; the migration
+-- revokes client execution on it. The CI database models its presence without
+-- installing a database-wide event trigger.
+create or replace function public.rls_auto_enable()
+returns event_trigger
+language plpgsql
+as $$
+begin
+  return;
+end;
+$$;
