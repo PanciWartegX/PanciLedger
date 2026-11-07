@@ -317,6 +317,7 @@ export async function createPooledFundExpenseAction(data: FormData) {
 
 export async function signOutAction() {
   const db = await createClient();
-  await db.auth.signOut();
-  redirect("/login");
+  const { error } = await db.auth.signOut({ scope: "local" });
+  if (error) redirect("/login?error=logout_failed");
+  redirect("/login?logged_out=1");
 }
