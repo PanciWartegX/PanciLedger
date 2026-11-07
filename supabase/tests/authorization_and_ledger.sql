@@ -38,9 +38,9 @@ declare
   tx2 uuid;
   budget1 uuid;
   budget2 uuid;
-  fund_id uuid;
+  v_fund_id uuid;
   invite_token uuid;
-  goal_id uuid;
+  v_goal_id uuid;
   movement_id uuid;
   progress numeric;
   pooled_balance numeric;
@@ -73,18 +73,18 @@ begin
   );
   if budget1 <> budget2 then raise exception 'Budget idempotency failed'; end if;
 
-  fund_id := public.create_pooled_fund(
+  v_fund_id := public.create_pooled_fund(
     '10000000-0000-0000-0000-000000000001','CI pooled fund',200,'IDR',
     '20000000-0000-0000-0000-000000000002',current_date+30,
     '30000000-0000-0000-0000-000000000003'
   );
   perform public.record_pooled_fund_contribution(
-    fund_id,'00000000-0000-0000-0000-000000000002',100,'CI contribution',
+    v_fund_id,'00000000-0000-0000-0000-000000000002',100,'CI contribution',
     '30000000-0000-0000-0000-000000000004'
   );
   begin
     perform public.record_pooled_fund_expense(
-      fund_id,120,'Must exceed available fund balance',
+      v_fund_id,120,'Must exceed available fund balance',
       '30000000-0000-0000-0000-000000000005'
     );
     raise exception 'Pooled fund accepted an expense above available balance';
@@ -92,24 +92,24 @@ begin
     null;
   end;
   perform public.record_pooled_fund_expense(
-    fund_id,80,'CI valid expense','30000000-0000-0000-0000-000000000006'
+    v_fund_id,80,'CI valid expense','30000000-0000-0000-0000-000000000006'
   );
-  select balance into pooled_balance from public.pooled_fund_balances where pooled_fund_balances.fund_id=fund_id;
+  select balance into pooled_balance from public.pooled_fund_balances where pooled_fund_balances.fund_id=v_fund_id;
   if pooled_balance <> 20 then raise exception 'Pooled fund balance mismatch: %', pooled_balance; end if;
 
-  goal_id := public.create_savings_goal(
+  v_goal_id := public.create_savings_goal(
     '10000000-0000-0000-0000-000000000001','CI savings goal',500,'IDR',
     '20000000-0000-0000-0000-000000000003',current_date+90
   );
   movement_id := public.move_savings_funds(
-    goal_id,'DEPOSIT',50,'20000000-0000-0000-0000-000000000001',
+    v_goal_id,'DEPOSIT',50,'20000000-0000-0000-0000-000000000001',
     '30000000-0000-0000-0000-000000000007'
   );
   perform public.move_savings_funds(
-    goal_id,'WITHDRAWAL',10,'20000000-0000-0000-0000-000000000001',
+    v_goal_id,'WITHDRAWAL',10,'20000000-0000-0000-0000-000000000001',
     '30000000-0000-0000-0000-000000000008'
   );
-  select balance into progress from public.savings_goal_progress where savings_goal_progress.goal_id=goal_id;
+  select balance into progress from public.savings_goal_progress where savings_goal_progress.goal_id=v_goal_id;
   if progress <> 40 then raise exception 'Savings balance mismatch: %', progress; end if;
 
   invite_token := public.create_workspace_invitation(
