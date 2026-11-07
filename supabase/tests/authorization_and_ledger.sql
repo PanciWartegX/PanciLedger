@@ -236,7 +236,7 @@ begin
     raise exception 'Verified invitation acceptance failed';
   end if;
 end;
-$$;
+$invite$;
 
 reset role;
 select 'PanciLedger authorization and ledger integration tests passed' as result;
