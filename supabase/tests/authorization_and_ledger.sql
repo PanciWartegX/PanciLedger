@@ -192,7 +192,8 @@ $$;
 
 -- The invited address must match the verified account before membership is added.
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000005',false);
-do $$
+select set_config('request.jwt.claims','{"email":"invitee@panciledger.test","sub":"00000000-0000-0000-0000-000000000005"}',false);
+do $
 declare token uuid;
 begin
   select invite_token into token from public.workspace_invitations
