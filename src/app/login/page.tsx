@@ -25,23 +25,20 @@ export default function LoginPage() {
     setCaptchaWidgetKey((value) => value + 1);
   }
 
-  function CaptchaField() {
-    if (!turnstileSiteKey) {
-      return <p className="text-xs text-amber-300">CAPTCHA belum dikonfigurasi. Pendaftaran akan aktif setelah Site Key Cloudflare ditambahkan.</p>;
-    }
-    return (
-      <div className="overflow-hidden">
-        <Turnstile
-          key={captchaWidgetKey}
-          siteKey={turnstileSiteKey}
-          onSuccess={setCaptchaToken}
-          onExpire={() => setCaptchaToken("")}
-          onError={() => setCaptchaToken("")}
-          options={{ theme: "dark" }}
-        />
-      </div>
-    );
-  }
+  const captchaWidget = turnstileSiteKey ? (
+    <div className="overflow-hidden">
+      <Turnstile
+        key={captchaWidgetKey}
+        siteKey={turnstileSiteKey}
+        onSuccess={setCaptchaToken}
+        onExpire={() => setCaptchaToken("")}
+        onError={() => setCaptchaToken("")}
+        options={{ theme: "dark" }}
+      />
+    </div>
+  ) : (
+    <p className="text-xs text-amber-300">CAPTCHA belum dikonfigurasi. Pendaftaran akan aktif setelah Site Key Cloudflare ditambahkan.</p>
+  );
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -153,7 +150,7 @@ export default function LoginPage() {
               <div className="text-right"><button type="button" onClick={() => { setMode("reset"); setMessage(""); resetCaptcha(); }} className="text-xs text-emerald-300 underline">Lupa kata sandi?</button></div>
               <input type="hidden" name="next" value={nextPath}/>
               <input type="hidden" name="captchaToken" value={captchaToken}/>
-              <CaptchaField/>
+              {captchaWidget}
               {message && <p role="status" className="rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-3 text-sm text-emerald-200">{message}</p>}
               <button type="submit" disabled={Boolean(turnstileSiteKey && !captchaReady)} className="primary w-full disabled:opacity-60">Masuk</button>
             </form>
