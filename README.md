@@ -73,7 +73,8 @@ Database utama sudah berisi data workspace dan transaksi. Jangan menghapus, mere
 2. Pasang dependensi: `npm install`.
 3. Salin `.env.example` menjadi `.env.local`.
 4. Isi `NEXT_PUBLIC_SUPABASE_URL` dan `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
-5. Untuk CAPTCHA, isi `NEXT_PUBLIC_TURNSTILE_SITE_KEY` dengan Site Key Cloudflare. Masukkan Secret Key Cloudflare di Supabase Dashboard, lalu aktifkan CAPTCHA untuk Auth.\n6. Jalankan `npm run dev`.
+5. Untuk CAPTCHA, isi `NEXT_PUBLIC_TURNSTILE_SITE_KEY` dengan Site Key Cloudflare. Masukkan Secret Key Cloudflare langsung di Supabase Dashboard, lalu aktifkan CAPTCHA untuk Auth.
+6. Jalankan `npm run dev`.
 
 ## Variabel lingkungan
 
@@ -81,8 +82,9 @@ Variabel yang digunakan aplikasi:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (wajib untuk mengaktifkan pendaftaran)
 
-Publishable key memang dirancang untuk dipakai di browser. Aplikasi tidak membutuhkan service-role/secret key di browser. Jangan menaruh secret key di variabel `NEXT_PUBLIC_*` atau menyimpannya di Git.
+Publishable key dan Turnstile Site Key memang dirancang untuk dipakai di browser. Aplikasi tidak membutuhkan service-role/secret key di browser. Jangan menaruh secret key di variabel `NEXT_PUBLIC_*` atau menyimpannya di Git.
 
 ## Vercel
 
