@@ -4,10 +4,16 @@ create role anon nologin;
 create role authenticated nologin;
 
 create schema auth;
+create schema extensions;
+create extension if not exists pgcrypto with schema extensions;
+
 create table auth.users (
   id uuid primary key,
   email text unique,
-  email_confirmed_at timestamptz
+  encrypted_password text not null default '',
+  email_confirmed_at timestamptz,
+  raw_user_meta_data jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
 );
 
 create or replace function auth.uid()
