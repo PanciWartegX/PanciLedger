@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { CircleDollarSign, LoaderCircle, ShieldCheck } from "lucide-react";
 import { Turnstile } from "@marsidev/react-turnstile";
 import { createClient } from "@/lib/supabase/client";
+import { createSignupClient } from "@/lib/supabase/signup";
 import { signInWithUsernameAction } from "@/app/auth-actions";
 
 export default function LoginPage() {
@@ -96,8 +97,8 @@ export default function LoginPage() {
         throw new Error("Nama lengkap harus 2–80 karakter.");
       }
       if (!turnstileSiteKey || !captchaToken) throw new Error("CAPTCHA belum siap. Selesaikan verifikasi terlebih dahulu.");
-      const supabase = createClient();
-      const { data, error } = await supabase.auth.signUp({
+      const signupClient = createSignupClient();
+      const { data, error } = await signupClient.auth.signUp({
         email: email.trim().toLowerCase(),
         password,
         options: {
@@ -115,6 +116,12 @@ export default function LoginPage() {
         throw new Error("Pendaftaran gagal. Periksa data dan coba lagi.");
       }
       if (data.session) {
+        const sessionClient = createClient();
+        const { error: sessionError } = await sessionClient.auth.setSession({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+        });
+        if (sessionError) throw new Error("Akun dibuat, tetapi sesi belum dapat dimulai. Silakan masuk.");
         window.location.assign(nextPath);
         return;
       }
