@@ -1,93 +1,63 @@
 # PanciLedger
 
-**PanciWartegX** — aplikasi pengelolaan keuangan untuk beberapa ruang kerja.
+> **Kelola kas kelas, transparan & mudah.**
 
-Antarmuka menggunakan Bahasa Indonesia dengan tema navy gelap dan aksen emerald. Target domain produksi: **https://panciledger.vercel.app**.
+PanciLedger adalah rancangan aplikasi web pencatatan uang kas kelas. Repository ini sengaja disiapkan sebagai **dokumen arahan dan fondasi pengembangan**, bukan aplikasi yang sudah berjalan.
 
-## Status pengembangan
+## Status repository
 
-PanciLedger masih dalam tahap pengembangan. Perubahan fitur terbaru berada pada branch `feature/cash-management-foundation` melalui [PR #2](https://github.com/PanciWartegX/PanciLedger/pull/2). PR tetap Draft sampai seluruh integrasi Supabase dan QA selesai.
+<badge>Dokumentasi / pre-development</badge>
 
-### Fitur yang sudah tersedia di branch pengembangan
+- Implementasi aplikasi lama telah dihentikan dan tidak dipertahankan di branch ini.
+- Repository ini berisi spesifikasi produk, aturan kerja developer/AI, arsitektur target, dan rencana implementasi.
+- **Belum ada aplikasi yang dapat dijalankan.** Tidak ada package manifest, source code, migration aktif, workflow CI, atau konfigurasi deployment.
+- Jangan menyatakan fitur telah selesai, diuji, atau aman sebelum benar-benar diimplementasikan dan diverifikasi.
 
-- Autentikasi email/kata sandi Supabase dan sesi sisi server.
-- Multi-workspace dan enam role: OWNER, ADMIN, TREASURER, AUDITOR, MEMBER, VIEWER.
-- Akun keuangan, saldo berbasis ledger, pemasukan, pengeluaran, transfer atomik, dan pembalikan transaksi tunggal.
-- Audit aktivitas workspace dan rekonsiliasi kas.
-- Anggaran berdasarkan periode, mata uang, dan akun.
-- Dana bersama: komitmen, pencatatan iuran, pengeluaran yang dibatasi saldo, serta progres anggota.
-- Target tabungan dengan setoran/penarikan sebagai transfer ledger.
-- Template transaksi berulang dengan eksekusi manual dan log idempoten.
-- Notifikasi transaksi dengan status baca per pengguna.
-- Undangan workspace berbasis email terverifikasi, token kedaluwarsa, penerimaan dan perpanjangan undangan.
-- Grafik arus kas 12 bulan dan ekspor transaksi POSTED ke CSV.
+## Mulai membaca
 
-### Batasan yang masih diketahui
+1. **[Blueprint Produk](docs/BLUEPRINT.md)** — spesifikasi kebutuhan, peran, modul, alur bisnis, skema data konseptual, RPC, RLS, dan kriteria rilis.
+2. **[Panduan Pengembangan](docs/DEVELOPMENT_GUIDE.md)** — urutan kerja, keputusan arsitektur, standar implementasi, pengujian, dan deployment.
+3. **[Instruksi Agen / Kontributor](AGENTS.md)** — aturan wajib untuk developer manusia maupun AI coding agent.
 
-- Migrasi fitur baru belum diterapkan ke project Supabase hosted yang terhubung. CI menguji seluruh migrasi pada PostgreSQL 17 sementara; pengujian CI bukan pengganti uji integrasi pada project Supabase terpisah.
-- Karena migrasi fitur baru belum diterapkan ke database hosted, modul anggaran, dana bersama, tabungan, transaksi berulang, notifikasi, dan undangan belum dapat dianggap aktif pada deployment yang memakai database tersebut.
-- Eksekusi transaksi berulang masih manual. Scheduler/cron otomatis belum dikonfigurasi.
-- Undangan menghasilkan tautan untuk dibagikan; pengiriman email otomatis belum diintegrasikan.
-- Ekspor yang tersedia saat ini adalah CSV. Ekspor PDF/XLSX, lampiran file, avatar/profil lengkap, dan pengaturan workspace lanjutan masih perlu dikembangkan.
-- Belum ada klaim siap produksi. Perlu uji end-to-end, verifikasi konfigurasi Supabase, backup, dan QA pengguna sebelum rilis.
+## Ringkasan produk
 
-## Teknologi
+- Admin mengelola master sekolah, kode undangan, approval, dan log registrasi.
+- Satu kelas memiliki satu Bendahara Utama dan dapat memiliki beberapa Bendahara Wakil.
+- Bendahara mengelola siswa, pengaturan kas, pembayaran, pengeluaran, token akses, dan laporan.
+- Siswa tidak perlu membuat akun; mereka memeriksa status kas melalui token kelas.
+- Perubahan data sensitif membutuhkan persetujuan admin.
 
-- Next.js App Router, React, TypeScript
-- Supabase Auth, PostgreSQL, Row Level Security, SQL RPC
-- Tailwind CSS, Recharts, Lucide
-- GitHub Actions dan Vercel Preview
+## Stack target
 
-## Menjalankan secara lokal
+- Next.js App Router + TypeScript
+- Supabase Auth + PostgreSQL + Row Level Security + SQL RPC
+- Vercel untuk hosting web
 
-1. Gunakan Node.js 20.9 atau lebih baru.
-2. Pasang dependensi: `npm install`.
-3. Salin `.env.example` menjadi `.env.local`.
-4. Isi `NEXT_PUBLIC_SUPABASE_URL` dan `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
-5. Jalankan `npm run dev`.
+Stack ini adalah keputusan target, bukan bukti bahwa integrasi telah dibuat.
 
-Jangan mengarahkan aplikasi pengembangan ke database Production. Siapkan project Supabase Free terpisah untuk development/Preview bila ingin menguji fitur baru secara langsung. Tinjau backup, urutan, dan isi semua file di `supabase/migrations` sebelum menerapkannya ke project hosted. Jangan menjalankan migrasi fitur baru pada database yang berisi data pengguna tanpa persetujuan eksplisit dan rencana pemulihan.
+## Aturan penting
 
-## Variabel lingkungan
+- Blueprint adalah sumber kebutuhan produk. Jika ada perubahan, buat revisi dokumen dan catat alasannya.
+- Jangan menghidupkan kembali konsep multi-workspace finance app dari implementasi terdahulu.
+- Jangan menambahkan source code, migration, konfigurasi framework, atau deployment sebelum ada instruksi implementasi yang jelas.
+- Jangan menganggap contoh SQL konseptual sebagai migration siap produksi.
+- Jangan pernah menaruh Supabase service-role/secret key di browser, repository, atau variabel `NEXT_PUBLIC_*`.
+- Semua akses lintas kelas, perubahan role, token publik, dan perhitungan kas wajib dirancang dengan validasi server dan RLS.
 
-Variabel yang digunakan aplikasi:
+## Rencana tingkat tinggi
 
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+1. Review dan finalisasi spesifikasi serta isu terbuka.
+2. Rancang skema PostgreSQL dan threat model.
+3. Implementasikan fondasi database, helper, RPC, dan RLS.
+4. Implementasikan autentikasi dan registrasi bendahara.
+5. Implementasikan dashboard admin dan approval.
+6. Implementasikan dashboard bendahara dan seluruh modul kas.
+7. Implementasikan pemeriksaan kas publik berbasis token.
+8. Jalankan pengujian keamanan, integrasi, dan penerimaan.
+9. Deploy Preview; Production hanya setelah persetujuan eksplisit.
 
-Publishable key memang dirancang untuk dipakai di browser. Aplikasi tidak membutuhkan service-role/secret key di browser. Jangan menaruh secret key di variabel `NEXT_PUBLIC_*` atau menyimpannya di Git.
+Lihat dokumen pengembangan untuk detail dan gerbang penerimaan.
 
-## Vercel
+---
 
-- Repository: `PanciWartegX/PanciLedger`
-- Project Vercel: `panciledger`
-- Production Branch yang dituju: `main`
-- Branch pengembangan: `feature/cash-management-foundation`
-- Domain target: `panciledger.vercel.app`
-
-Deployment Preview digunakan untuk QA. Pastikan environment Preview menunjuk ke project Supabase development, bukan database Production. Production deployment dan migrasi database Production memerlukan persetujuan eksplisit setelah QA.
-
-## Database dan keamanan
-
-- Nilai uang disimpan dengan PostgreSQL `numeric`, bukan floating point.
-- Perubahan saldo berasal dari ledger; jangan mengubah saldo akun secara langsung.
-- Transaksi POSTED tidak dapat diedit atau dihapus secara langsung; koreksi dilakukan melalui alur pembalikan yang tervalidasi.
-- Transfer menggunakan dua sisi transaksi yang dibuat secara atomik.
-- RPC memeriksa role di server/database; RLS menjadi batas isolasi workspace.
-- Tabel dan fungsi sensitif menggunakan grant minimum.
-- Storage dan lampiran privat belum diimplementasikan.
-
-## CI dan QA
-
-GitHub Actions menjalankan:
-
-1. Instalasi dependensi.
-2. TypeScript check.
-3. ESLint.
-4. Build Next.js.
-5. Bootstrap PostgreSQL 17 sementara dan lapisan Auth minimal.
-6. Menjalankan semua migrasi dari database kosong.
-7. Memverifikasi tabel, RPC inti, dan RLS.
-8. Menguji isolasi workspace, hak role, idempotensi transaksi/anggaran, dana bersama, tabungan, notifikasi, dan undangan.
-
-CI yang lulus membuktikan rangkaian migrasi dan pemeriksaan tersebut pada database uji sementara. CI tidak membuktikan konfigurasi environment hosted, email delivery, scheduler, atau seluruh alur UI sudah siap produksi.
+**PanciLedger · Blueprint v1.0 · Status: arahan pengembangan, belum diimplementasikan**
