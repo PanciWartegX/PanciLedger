@@ -1,1 +1,0 @@
-drop function if exists public.resolve_auth_email_for_login(text,text);
