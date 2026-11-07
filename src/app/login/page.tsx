@@ -176,7 +176,8 @@ export default function LoginPage() {
               <label className="block text-sm text-slate-300">Kata sandi
                 <input required minLength={8} maxLength={256} type="password" autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} className="field mt-2" placeholder="Minimal 8 karakter"/>
               </label>
-              <CaptchaField/>
+              {captchaWidget}
+              <input type="hidden" name="captchaToken" value={captchaToken}/>
               {message && <p role="status" className="rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-3 text-sm text-emerald-200">{message}</p>}
               <button type="submit" disabled={busy || !captchaReady} className="primary flex w-full items-center justify-center gap-2 disabled:opacity-60">{busy && <LoaderCircle className="animate-spin" size={17}/>} Daftar akun</button>
             </form>
@@ -185,7 +186,7 @@ export default function LoginPage() {
               <label className="block text-sm text-slate-300">Email akun
                 <input required type="email" autoComplete="email" value={email} onChange={event => setEmail(event.target.value)} className="field mt-2" placeholder="you@example.com"/>
               </label>
-              <CaptchaField/>
+              {captchaWidget}
               {message && <p role="status" className="rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-3 text-sm text-emerald-200">{message}</p>}
               <button type="submit" disabled={busy || Boolean(turnstileSiteKey && !captchaReady)} className="primary flex w-full items-center justify-center gap-2 disabled:opacity-60">{busy && <LoaderCircle className="animate-spin" size={17}/>} Kirim tautan pemulihan</button>
             </form>
